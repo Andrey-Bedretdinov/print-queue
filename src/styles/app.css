@@ -69,8 +69,16 @@ input {
   -webkit-app-region: drag;
 }
 
-.chrome > *,
-.toolbar > * {
+/*
+ * Из перетаскивания исключается только то, что само ловит мышь. Раньше здесь
+ * стояло «.chrome > *», и no-drag получали в том числе .brand и .chrome-spacer,
+ * а спейсер растянут на всю свободную ширину — тащить окно было попросту
+ * не за что, кроме восьмипиксельных щелей между кнопками.
+ */
+.chrome button,
+.chrome input,
+.chrome .search,
+.chrome .win-btns {
   -webkit-app-region: no-drag;
 }
 
