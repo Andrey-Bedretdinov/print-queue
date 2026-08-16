@@ -11,26 +11,12 @@ interface Props {
   onPreview?: (job: Job) => void
   overlay?: boolean
   selected?: boolean
-  /** Принтер действительно печатает — не стоит, не в ошибке и не на паузе. */
-  printerRunning?: boolean
   onSelect?: (job: Job, e: React.MouseEvent) => void
   onMenu?: (job: Job, e: React.MouseEvent) => void
 }
 
-export function JobRow({
-  job,
-  onPreview,
-  overlay,
-  selected,
-  printerRunning,
-  onSelect,
-  onMenu,
-}: Props) {
-  // Данные печатающегося задания уже ушли на принтер — переносить нечего.
-  // Но если принтер встал (ошибка, нет бумаги, пауза), задание никуда не
-  // уходит и его надо уметь увести на живой принтер.
-  const locked = job.source === 'system' && job.state === 'printing' && printerRunning === true
-  const sortable = useSortable({ id: job.id, disabled: overlay || locked })
+export function JobRow({ job, onPreview, overlay, selected, onSelect, onMenu }: Props) {
+  const sortable = useSortable({ id: job.id, disabled: overlay })
   const total = job.pages * job.copies
   const percent = total > 0 ? Math.min(100, (job.printedPages / total) * 100) : 0
   const done = job.state === 'completed'
@@ -51,7 +37,7 @@ export function JobRow({
     <div
       ref={overlay ? undefined : sortable.setNodeRef}
       style={style}
-      className={`job ${job.state}${sortable.isDragging && !overlay ? ' ghost' : ''}${overlay ? ' drag' : ''}${selected ? ' sel' : ''}${locked ? ' locked' : ''}`}
+      className={`job ${job.state}${sortable.isDragging && !overlay ? ' ghost' : ''}${overlay ? ' drag' : ''}${selected ? ' sel' : ''}`}
       {...(overlay ? {} : sortable.attributes)}
       {...(overlay ? {} : sortable.listeners)}
       onClick={(e) => onSelect?.(job, e)}
@@ -61,11 +47,7 @@ export function JobRow({
         onMenu?.(job, e)
       }}
       onDoubleClick={() => job.path && onPreview?.(job)}
-      title={
-        locked
-          ? `${job.name} — уже печатается, перенос недоступен`
-          : `${job.name} · ${pages(total)} · ${bytes(job.bytes)}`
-      }
+      title={`${job.name} · ${pages(total)} · ${bytes(job.bytes)}`}
     >
       <span className="ftype" style={{ background: typeColor(job.ext) }}>
         {typeLabel(job.ext)}

@@ -110,6 +110,8 @@ export interface Settings {
   cardHeight: number
   /** Подгонять высоту блоков под окно, чтобы не оставалось пустого места. */
   cardAuto: boolean
+  /** Принтеры, которым приложение включило сохранение файла задания. */
+  prepared: string[]
 }
 
 export interface AppState {

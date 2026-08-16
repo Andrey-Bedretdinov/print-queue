@@ -30,6 +30,7 @@ const DEFAULTS: Persisted = {
     layout: 'board',
     cardHeight: 240,
     cardAuto: true,
+    prepared: [],
   },
   incidents: [],
   order: {},

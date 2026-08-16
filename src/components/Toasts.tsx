@@ -44,7 +44,7 @@ export function Toasts({ items, onClose }: Props) {
                     onClose(t.id)
                   }}
                 >
-                  Включить очередь печати
+                  Разрешить перенос
                 </button>
               )}
             </span>

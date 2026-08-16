@@ -582,6 +582,20 @@ export default function App() {
                 onAll={(visible) =>
                   api.settings({ hidden: visible ? [] : state.printers.map((p) => p.id) })
                 }
+                onPrepare={async () => {
+                  const targets = state.printers.filter((p) => p.source === 'system')
+                  let done = 0
+                  for (const p of targets) {
+                    const res = await api.enableSpooling(p.id)
+                    if (res?.ok) done += 1
+                  }
+                  setPicker(false)
+                  pushToast(
+                    done ? 'ok' : 'warn',
+                    `Перенос разрешён: ${done} из ${targets.length}`,
+                    done ? 'Задания будут сохраняться до переноса' : 'Не хватило прав',
+                  )
+                }}
                 onClose={() => setPicker(false)}
               />
             )}

@@ -16,6 +16,7 @@ import {
   systemJobAction,
   systemPrintFile,
   systemPrinterAction,
+  purgePrintedJobs,
 } from './windows-source'
 import { canMoveSystemJobs, explain, log, moveSpoolJob } from './spool'
 import { SpoolWatcher } from './watcher'
@@ -31,6 +32,7 @@ export class PrintManager {
   private systemAvailable = false
   private timer: NodeJS.Timeout | null = null
   private watcher: SpoolWatcher | null = null
+  private cleaner: NodeJS.Timeout | null = null
   private polling = false
   private dirty = true
 
@@ -71,10 +73,14 @@ export class PrintManager {
     this.watcher.start()
     void this.pollSystem()
     void this.checkSpoolAccess()
+    this.cleaner = setInterval(() => {
+      void purgePrintedJobs(store.settings.prepared)
+    }, 5 * 60_000)
   }
 
   stop() {
     if (this.timer) clearInterval(this.timer)
+    if (this.cleaner) clearInterval(this.cleaner)
     this.watcher?.stop()
   }
 
@@ -329,22 +335,11 @@ export class PrintManager {
       }
       const { printer: sourceName, id } = jobRef(jobId)
       // Переносим сам спул-файл: это работает и для заданий из чужих программ.
-      const res = await moveSpoolJob(sourceName, id, target.name)
+      const res = await moveSpoolJob(sourceName, id, target.name, job.bytes)
       void this.pollSystem()
       if (res.ok) return { ok: true }
 
       const code = res.error?.split('|')[0]
-
-      // Данные печатающегося задания спулер уже отдал принтеру и стёр с диска,
-      // поэтому переносить можно только то, что ещё ждёт очереди. К вставшему
-      // принтеру это не относится: там задание никуда не ушло.
-      const source = this.sysPrinters.find((p) => p.id === job.printerId)
-      if (code === 'no-spool-file' && job.state === 'printing' && source?.state === 'printing') {
-        return {
-          ok: false,
-          reason: 'Задание уже печатается — перенести можно только ожидающие в очереди',
-        }
-      }
       const reason = explain(res.error)
       return {
         ok: false,
@@ -416,11 +411,17 @@ export class PrintManager {
     return { ok: added > 0, added }
   }
 
-  /** Включает очередь печати у системного принтера — по кнопке в уведомлении. */
+  /**
+   * Готовит принтер к переносу: очередь вместо прямой печати и сохранение файла
+   * задания после печати — иначе уже отправленное на принтер перенести нельзя.
+   */
   async enableSpooling(printerId: string) {
     const sys = this.sysPrinters.find((p) => p.id === printerId)
     if (!sys) return { ok: false, reason: 'Принтер не найден' }
     const ok = await enableSpooling(sys.name)
+    if (ok && !store.settings.prepared.includes(sys.name)) {
+      store.patchSettings({ prepared: [...store.settings.prepared, sys.name] })
+    }
     void this.pollSystem()
     return ok ? { ok: true } : { ok: false, reason: 'Нужны права администратора' }
   }

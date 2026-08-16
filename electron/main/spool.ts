@@ -84,41 +84,80 @@ public static class PQSpool
         return sb.ToString();
     }
 
-    /** Номер задания в конце имени: «00162.SPL» и «FP00162.SPL» одинаково валидны. */
-    static bool Matches(string file, uint jobId)
+    static byte[] Head(string file, int max)
     {
-        string name = Path.GetFileNameWithoutExtension(file);
-        int end = name.Length;
-        while (end > 0 && char.IsDigit(name[end - 1])) end--;
-        if (end == name.Length) return false;
-        uint n;
-        return uint.TryParse(name.Substring(end), out n) && n == jobId;
+        using (FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        {
+            int len = (int)Math.Min(max, fs.Length);
+            byte[] buf = new byte[len];
+            int done = 0;
+            while (done < len)
+            {
+                int n = fs.Read(buf, done, len - done);
+                if (n <= 0) break;
+                done += n;
+            }
+            return buf;
+        }
+    }
+
+    /** Номер задания лежит в заголовке .SHD отдельным полем. */
+    static bool HasJobId(byte[] head, uint jobId)
+    {
+        for (int i = 0; i + 4 <= Math.Min(head.Length, 256); i += 4)
+        {
+            uint v = (uint)(head[i] | (head[i + 1] << 8) | (head[i + 2] << 16) | (head[i + 3] << 24));
+            if (v == jobId) return true;
+        }
+        return false;
     }
 
     /**
-     * Спул-файл может лежать в общем каталоге или в каталоге принтера, а имя —
-     * с префиксом: на разных системах спулер пишет и «00162.SPL», и «FP00162.SPL».
+     * Имя спул-файла со счётчиком спулера, а не с номером задания: «FP00152.SPL»
+     * может принадлежать заданию 166. Поэтому файл ищется по содержимому пары
+     * .SHD — там лежат имя принтера и документа — и по совпадению размера.
      */
-    static string FindSpool(string dirs, uint jobId)
+    static string FindSpool(string dirs, uint jobId, string printer, string document, long size)
     {
+        string best = null;
+        int bestScore = 0;
         foreach (string dir in dirs.Split(';'))
         {
             if (dir.Length == 0) continue;
             string exact = Path.Combine(dir, jobId.ToString("00000") + ".SPL");
             if (File.Exists(exact)) return exact;
-            string prefixed = Path.Combine(dir, "FP" + jobId.ToString("00000") + ".SPL");
-            if (File.Exists(prefixed)) return prefixed;
             if (!Directory.Exists(dir)) continue;
-            try
+            string[] files;
+            try { files = Directory.GetFiles(dir, "*.SPL"); }
+            catch (UnauthorizedAccessException) { continue; }
+
+            foreach (string f in files)
             {
-                foreach (string f in Directory.GetFiles(dir, "*.SPL"))
+                int score = 0;
+                try
                 {
-                    if (Matches(f, jobId)) return f;
+                    string shd = Path.Combine(
+                        Path.GetDirectoryName(f), Path.GetFileNameWithoutExtension(f) + ".SHD");
+                    if (File.Exists(shd))
+                    {
+                        byte[] head = Head(shd, 64 * 1024);
+                        if (HasJobId(head, jobId)) score += 4;
+                        string text = System.Text.Encoding.Unicode.GetString(head);
+                        if (!string.IsNullOrEmpty(document) &&
+                            text.IndexOf(document, StringComparison.OrdinalIgnoreCase) >= 0) score += 3;
+                        if (!string.IsNullOrEmpty(printer) &&
+                            text.IndexOf(printer, StringComparison.OrdinalIgnoreCase) >= 0) score += 2;
+                    }
+                    if (size > 0 && new FileInfo(f).Length == size) score += 2;
                 }
+                catch (IOException) { continue; }
+                catch (UnauthorizedAccessException) { continue; }
+
+                if (score > bestScore) { bestScore = score; best = f; }
             }
-            catch (UnauthorizedAccessException) { /* причина уйдёт в диагностику */ }
         }
-        return null;
+        // Одного размера мало: нужен номер задания либо имя документа.
+        return bestScore >= 3 ? best : null;
     }
 
     static IntPtr Open(string printer)
@@ -141,14 +180,14 @@ public static class PQSpool
         return buf;
     }
 
-    public static string Move(string source, uint jobId, string target, string spoolDirs)
+    public static string Move(string source, uint jobId, string target, string spoolDirs, long size)
     {
         IntPtr src = Open(source);
         bool paused = false;
         try
         {
-            uint size;
-            IntPtr buf = JobBuffer(src, jobId, out size);
+            uint bufSize;
+            IntPtr buf = JobBuffer(src, jobId, out bufSize);
             JOB_INFO_1 info = (JOB_INFO_1)Marshal.PtrToStructure(buf, typeof(JOB_INFO_1));
             string datatype = Marshal.PtrToStringUni(info.pDatatype);
             string document = Marshal.PtrToStringUni(info.pDocument);
@@ -157,11 +196,12 @@ public static class PQSpool
             // Пауза не даёт спулеру дочитать задание, пока мы его копируем.
             paused = SetJob(src, jobId, 0, IntPtr.Zero, JOB_CONTROL_PAUSE);
 
-            string spl = FindSpool(spoolDirs, jobId);
+            string spl = FindSpool(spoolDirs, jobId, source, document, size);
             if (spl == null)
                 throw new Exception(
                     "no-spool-file|задание " + jobId + " статус 0x" + info.Status.ToString("X") +
-                    " тип " + datatype + Describe(spoolDirs));
+                    " размер " + size + " документ " + document + " тип " + datatype +
+                    Describe(spoolDirs));
             byte[] data = File.ReadAllBytes(spl);
             if (data.Length == 0) throw new Exception("empty-spool-file");
 
@@ -212,7 +252,7 @@ public static class PQSpool
 "@
 
 try {
-  [PQSpool]::Move('__SRC__', __JOB__, '__DST__', '__DIR__')
+  [PQSpool]::Move('__SRC__', __JOB__, '__DST__', '__DIR__', __SIZE__)
 } catch {
   $m = $_.Exception.Message
   if ($_.Exception.InnerException) { $m = $_.Exception.InnerException.Message }
@@ -229,7 +269,7 @@ export interface SpoolMoveResult {
 
 const REASON: Record<string, string> = {
   'no-spool-file':
-    'Нет файла задания: в свойствах принтера включите «Использовать очередь печати»',
+    'Файл задания не сохранён — нажмите «Разрешить перенос», и следующие задания переедут',
   'empty-spool-file': 'Файл задания ещё пуст — повторите через секунду',
   'job-gone:0': 'Задание уже ушло из очереди',
 }
@@ -265,12 +305,14 @@ export async function moveSpoolJob(
   source: string,
   jobId: number,
   target: string,
+  size = 0,
 ): Promise<SpoolMoveResult> {
   const dirs = await spoolDirs(source)
   const script = HELPER.replace('__SRC__', psq(source))
     .replace('__JOB__', String(jobId))
     .replace('__DST__', psq(target))
     .replace('__DIR__', psq(dirs.join(';')))
+    .replace('__SIZE__', String(Math.max(0, Math.round(size))))
   const res = (await psJson<SpoolMoveResult>(script, 30000)) ?? {
     ok: false,
     error: 'helper-failed',

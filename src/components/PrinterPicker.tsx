@@ -8,6 +8,7 @@ interface Props {
   hidden: string[]
   onToggle: (id: string) => void
   onAll: (visible: boolean) => void
+  onPrepare: () => void
   onClose: () => void
 }
 
@@ -23,7 +24,7 @@ const ICON: Record<ConnectionKind, React.ReactNode> = {
   virtual: <IcoPrinter size={11} />,
 }
 
-export function PrinterPicker({ printers, hidden, onToggle, onAll, onClose }: Props) {
+export function PrinterPicker({ printers, hidden, onToggle, onAll, onPrepare, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -91,7 +92,12 @@ export function PrinterPicker({ printers, hidden, onToggle, onAll, onClose }: Pr
       </div>
 
       <div className="popover-foot">
-        {shown} из {printers.length}
+        <span>
+          {shown} из {printers.length}
+        </span>
+        <button className="chip" style={{ height: 20 }} onClick={onPrepare}>
+          Разрешить перенос у всех
+        </button>
       </div>
     </motion.div>
   )

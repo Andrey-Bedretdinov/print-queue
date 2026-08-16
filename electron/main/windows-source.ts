@@ -260,17 +260,36 @@ export async function systemPrinterAction(name: string, kind: 'pause' | 'resume'
 }
 
 /**
- * Включает очередь печати: снимает «печатать напрямую» и просит спулер дождаться
- * последней страницы. Без очереди на диске нет спул-файла, а значит нечего и
- * переносить между принтерами.
+ * Готовит принтер к переносу заданий:
+ *   0x2   DIRECT            — печать мимо очереди, снимаем;
+ *   0x200 DO_COMPLETE_FIRST — печатать после полного помещения в очередь;
+ *   0x100 KEEPPRINTEDJOBS   — сохранять файл задания после печати, иначе
+ *                             спулер стирает его сразу и переносить нечего.
  */
 export async function enableSpooling(name: string) {
   const filter = psq(name).replace(/"/g, '')
   return psRun(
     `$p = Get-CimInstance Win32_Printer -Filter "Name='${filter}'"; ` +
       `if (-not $p) { exit 1 }; ` +
-      `$p.Attributes = (([int]$p.Attributes -bor 0x200) -band (-bnot 0x2)); ` +
+      `$p.Attributes = (([int]$p.Attributes -bor 0x200 -bor 0x100) -band (-bnot 0x2)); ` +
       `Set-CimInstance -InputObject $p -ErrorAction Stop`,
+  )
+}
+
+/**
+ * Сохранение напечатанного нужно только для переноса, поэтому очередь чистится
+ * сама — но лишь у принтеров, которым приложение это сохранение включило.
+ */
+export async function purgePrintedJobs(printers: string[]) {
+  if (!printers.length) return true
+  const list = printers.map((n) => `'${psq(n)}'`).join(',')
+  return psRun(
+    `$names = @(${list}); $cut = (Get-Date).AddMinutes(-5); ` +
+      `Get-CimInstance Win32_PrintJob | ` +
+      `Where-Object { ($_.StatusMask -band 0x80) -and $_.TimeSubmitted -and ([datetime]$_.TimeSubmitted) -lt $cut } | ` +
+      `Where-Object { $job = $_; @($names | Where-Object { $job.Name.StartsWith($_ + ',') }).Count -gt 0 } | ` +
+      `ForEach-Object { $null = Invoke-CimMethod -InputObject $_ -MethodName Delete }`,
+    20000,
   )
 }
 
