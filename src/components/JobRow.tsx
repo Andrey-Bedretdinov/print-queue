@@ -16,7 +16,9 @@ interface Props {
 }
 
 export function JobRow({ job, onPreview, overlay, selected, onSelect, onMenu }: Props) {
-  const sortable = useSortable({ id: job.id, disabled: overlay })
+  // Печатающееся задание Windows уже отдала принтеру — тащить его некуда.
+  const locked = job.source === 'system' && job.state === 'printing'
+  const sortable = useSortable({ id: job.id, disabled: overlay || locked })
   const total = job.pages * job.copies
   const percent = total > 0 ? Math.min(100, (job.printedPages / total) * 100) : 0
   const done = job.state === 'completed'
@@ -37,7 +39,7 @@ export function JobRow({ job, onPreview, overlay, selected, onSelect, onMenu }: 
     <div
       ref={overlay ? undefined : sortable.setNodeRef}
       style={style}
-      className={`job ${job.state}${sortable.isDragging && !overlay ? ' ghost' : ''}${overlay ? ' drag' : ''}${selected ? ' sel' : ''}`}
+      className={`job ${job.state}${sortable.isDragging && !overlay ? ' ghost' : ''}${overlay ? ' drag' : ''}${selected ? ' sel' : ''}${locked ? ' locked' : ''}`}
       {...(overlay ? {} : sortable.attributes)}
       {...(overlay ? {} : sortable.listeners)}
       onClick={(e) => onSelect?.(job, e)}
@@ -47,7 +49,11 @@ export function JobRow({ job, onPreview, overlay, selected, onSelect, onMenu }: 
         onMenu?.(job, e)
       }}
       onDoubleClick={() => job.path && onPreview?.(job)}
-      title={`${job.name} · ${pages(total)} · ${bytes(job.bytes)}`}
+      title={
+        locked
+          ? `${job.name} — уже печатается, перенос недоступен`
+          : `${job.name} · ${pages(total)} · ${bytes(job.bytes)}`
+      }
     >
       <span className="ftype" style={{ background: typeColor(job.ext) }}>
         {typeLabel(job.ext)}

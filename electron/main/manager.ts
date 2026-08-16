@@ -331,6 +331,15 @@ export class PrintManager {
       const res = await moveSpoolJob(sourceName, id, target.name)
       void this.pollSystem()
       if (res.ok) return { ok: true }
+
+      // Данные печатающегося задания спулер уже отдал принтеру и стёр с диска,
+      // поэтому переносить можно только то, что ещё ждёт очереди.
+      if (res.error === 'no-spool-file' && job.state === 'printing') {
+        return {
+          ok: false,
+          reason: 'Задание уже печатается — перенести можно только ожидающие в очереди',
+        }
+      }
       const reason = explain(res.error)
       return {
         ok: false,

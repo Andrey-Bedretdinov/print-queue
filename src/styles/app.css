@@ -942,6 +942,11 @@ input {
   opacity: 0.35;
 }
 
+/* Печатается прямо сейчас: тащить нечего, данные уже у принтера. */
+.job.locked {
+  cursor: default;
+}
+
 .job.sel {
   background: var(--active);
   border-color: var(--primary);
