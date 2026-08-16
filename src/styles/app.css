@@ -999,6 +999,55 @@ input {
   flex: none;
 }
 
+/* Снимок вместо подписи с расширением: по нему сразу видно, что за файл. */
+.ftype.shot {
+  overflow: hidden;
+  background: var(--line);
+  box-shadow: inset 0 0 0 1px #0000001a;
+}
+
+.ftype.shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/*
+ * Увеличение по наведению. Висит на body порталом — внутри колонки его срезало
+ * бы overflow, — и не ловит мышь, чтобы не мигать при собственном появлении.
+ */
+.shot-pop {
+  position: fixed;
+  z-index: 90;
+  transform: translateY(-50%);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 232px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+}
+
+.shot-pop img {
+  display: block;
+  max-width: 224px;
+  max-height: 200px;
+  border-radius: var(--radius-sm);
+}
+
+.shot-pop span {
+  font-size: 10px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .job-name {
   font-size: 11.5px;
   line-height: 16px;

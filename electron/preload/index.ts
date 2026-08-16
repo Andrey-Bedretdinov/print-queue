@@ -46,6 +46,8 @@ const api = {
   addFiles: (paths: string[], printerId: string): Promise<{ ok: boolean; added: number }> =>
     ipcRenderer.invoke(IPC.invoke.addFiles, paths, printerId),
   preview: (path: string): Promise<PreviewPayload> => ipcRenderer.invoke(IPC.invoke.preview, path),
+  /** Уменьшенная копия снимка (data-URL) либо пустая строка. */
+  thumb: (path: string): Promise<string> => ipcRenderer.invoke(IPC.invoke.thumb, path),
   openExternal: (path: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.invoke.openExternal, path),
   incident: (kind: IncidentActionKind, id?: string, printerId?: string): Promise<boolean> =>

@@ -7,7 +7,7 @@ import type { JobActionKind, PrinterActionKind, ToastMessage } from '../../share
 import type { AppState, Settings } from '../../shared/types'
 import { initStore, store } from './store'
 import { PrintManager } from './manager'
-import { buildPreview } from './preview'
+import { buildPreview, thumbnail } from './preview'
 import { psRun } from './powershell'
 
 process.env.APP_ROOT = join(__dirname, '..', '..')
@@ -143,6 +143,7 @@ ipcMain.handle(IPC.invoke.pickFiles, async () => {
 })
 
 ipcMain.handle(IPC.invoke.preview, (_e, path: string) => buildPreview(path))
+ipcMain.handle(IPC.invoke.thumb, (_e, path: string) => thumbnail(path))
 
 ipcMain.handle(IPC.invoke.openExternal, async (_e, path: string) => {
   const err = await shell.openPath(path)

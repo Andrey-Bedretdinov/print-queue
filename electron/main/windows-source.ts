@@ -1,6 +1,7 @@
 import { psJson, psRun, psq } from './powershell'
 import type { ConnectionKind, Job, JobFailure, Printer, PrinterState } from '../../shared/types'
 import { signatureOf } from './signature'
+import { pathForJob, rememberPrinted } from './origins'
 
 interface RawPrinter {
   Name: string
@@ -214,6 +215,8 @@ export function parseSystem(raw: RawSnapshot): { printers: Printer[]; jobs: Job[
       printerId: idFor(j.Printer),
       name,
       ext,
+      // Спулер путь не хранит, но печать через приложение мы помним сами.
+      path: pathForJob(name),
       bytes: Number(j.Size) || 0,
       pages: Math.max(1, j.Pages || 1),
       printedPages: j.PagesPrinted || 0,
@@ -299,6 +302,7 @@ export async function renameSystemPrinter(oldName: string, newName: string) {
 
 /** Sends a file to a named printer through the shell's PrintTo verb. */
 export async function systemPrintFile(filePath: string, printerName: string) {
+  rememberPrinted(filePath)
   return psRun(
     `Start-Process -FilePath '${psq(filePath)}' -Verb PrintTo -ArgumentList '"${psq(printerName).replace(/"/g, '')}"' -WindowStyle Hidden`,
     20000,

@@ -3,8 +3,9 @@ import { CSS } from '@dnd-kit/utilities'
 import type { Job } from '../../shared/types'
 import { FAILURE_LABEL } from '../../shared/types'
 import { api } from '../lib/api'
-import { bytes, clock, pages, typeColor, typeLabel } from '../lib/format'
+import { bytes, clock, pages } from '../lib/format'
 import { IcoAlert, IcoCheck, IcoEye, IcoPause, IcoPlay, IcoRetry, IcoTop, IcoX } from './icons'
+import { FileBadge } from './FileBadge'
 
 interface Props {
   job: Job
@@ -49,9 +50,7 @@ export function JobRow({ job, onPreview, overlay, selected, onSelect, onMenu }: 
       onDoubleClick={() => job.path && onPreview?.(job)}
       title={`${job.name} · ${pages(total)} · ${bytes(job.bytes)}`}
     >
-      <span className="ftype" style={{ background: typeColor(job.ext) }}>
-        {typeLabel(job.ext)}
-      </span>
+      <FileBadge job={job} />
 
       <span className="job-name">
         {job.state === 'error' && <IcoAlert size={10} />}

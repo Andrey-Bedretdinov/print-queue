@@ -1,3 +1,4 @@
+import { nativeImage } from 'electron'
 import { readFile, stat, open } from 'node:fs/promises'
 import { basename, extname } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -23,6 +24,51 @@ const OFFICE: Record<string, string> = {
 /** file:// is blocked from the renderer's origin, so previews use our scheme. */
 export function previewUrl(path: string) {
   return 'pq-file://local' + pathToFileURL(path).pathname
+}
+
+/**
+ * Уменьшенная копия снимка для очереди: и в значок строки, и в увеличение по
+ * наведению. Отдавать в интерфейс сам файл нельзя — в фотоочереди это десятки
+ * мегабайт на строку, которые браузер честно раскодирует целиком ради шестнадцати
+ * пикселей. nativeImage умеет это сам, без сторонних библиотек.
+ */
+const THUMB_WIDTH = 220
+const THUMB_LIMIT = 200
+const thumbs = new Map<string, string>()
+
+export async function thumbnail(path: string) {
+  const hit = thumbs.get(path)
+  if (hit !== undefined) return hit
+
+  let url = ''
+  try {
+    const ext = extname(path).slice(1).toLowerCase()
+    if (IMAGE.has(ext)) {
+      const image = nativeImage.createFromPath(path)
+      if (!image.isEmpty()) {
+        const small =
+          image.getSize().width > THUMB_WIDTH
+            ? image.resize({ width: THUMB_WIDTH, quality: 'good' })
+            : image
+        // Фотографии уезжают JPEG'ом: PNG с той же картинки тяжелее на порядок,
+        // а прозрачности в снимке всё равно нет.
+        url =
+          ext === 'jpg' || ext === 'jpeg'
+            ? `data:image/jpeg;base64,${small.toJPEG(78).toString('base64')}`
+            : small.toDataURL()
+      }
+    }
+  } catch {
+    /* нечитаемый файл — строка обойдётся значком с расширением */
+  }
+
+  // Кэш держит только последние снимки: очередь живёт долго, память — нет.
+  if (thumbs.size >= THUMB_LIMIT) {
+    const oldest = thumbs.keys().next().value
+    if (oldest !== undefined) thumbs.delete(oldest)
+  }
+  thumbs.set(path, url)
+  return url
 }
 
 function decode(buf: Buffer) {

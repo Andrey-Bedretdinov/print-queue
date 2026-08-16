@@ -11,6 +11,7 @@ export const IPC = {
     addFiles: 'pq:add-files',
     pickFiles: 'pq:pick-files',
     preview: 'pq:preview',
+    thumb: 'pq:thumb',
     openExternal: 'pq:open-external',
     incident: 'pq:incident',
     settings: 'pq:settings',
