@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -131,6 +131,9 @@ export default function App() {
     // The board only exists once the first state has arrived.
   }, [state !== null])
 
+  /** Авто-высота: блоки делят высоту окна на строки без остатка внизу. */
+  const [autoHeight, setAutoHeight] = useState(0)
+
   // ---------------------------------------------------------------- derive
 
   const settings = state?.settings
@@ -196,6 +199,40 @@ export default function App() {
       hidden: hidden.length,
     }
   }, [state?.jobs, visiblePrinters, hidden])
+
+  const grid = settings?.layout === 'grid'
+  const cardHeight = settings ? (settings.cardAuto && autoHeight ? autoHeight : settings.cardHeight) : 240
+
+  const autoRef = useRef(0)
+
+  useLayoutEffect(() => {
+    const board = boardRef.current
+    if (!grid || !settings?.cardAuto || !board || columns.length === 0) return
+    let frame = 0
+    const compute = () => {
+      const style = getComputedStyle(board)
+      const cols = style.gridTemplateColumns.split(' ').filter(Boolean).length || 1
+      const gap = parseFloat(style.rowGap) || 8
+      const pad = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0)
+      const rows = Math.max(1, Math.ceil(columns.length / cols))
+      const free = board.clientHeight - pad - (rows - 1) * gap
+      const next = Math.max(132, Math.floor(free / rows))
+      // Порог гасит колебания «появился скроллбар — изменилась высота — исчез».
+      if (Math.abs(next - autoRef.current) <= 2) return
+      autoRef.current = next
+      setAutoHeight(next)
+    }
+    compute()
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(compute)
+    })
+    ro.observe(board)
+    return () => {
+      cancelAnimationFrame(frame)
+      ro.disconnect()
+    }
+  }, [grid, settings?.cardAuto, columns.length])
 
   // ----------------------------------------------------------------- drag
 
@@ -492,8 +529,10 @@ export default function App() {
           onPicker={() => setPicker((v) => !v)}
           onToggleSim={() => api.settings({ simulation: !settings.simulation })}
           onToggleRail={() => api.settings({ railCollapsed: !settings.railCollapsed })}
+          cardHeight={cardHeight}
           onLayout={(layout) => api.settings({ layout })}
-          onCardHeight={(cardHeight) => api.settings({ cardHeight })}
+          onCardHeight={(value) => api.settings({ cardHeight: value, cardAuto: false })}
+          onCardAuto={() => api.settings({ cardAuto: !settings.cardAuto })}
         >
           <AnimatePresence>
             {picker && (
@@ -531,9 +570,9 @@ export default function App() {
             </AnimatePresence>
 
             <div
-              className={`board${settings.layout === 'grid' ? ' grid' : ''}`}
+              className={`board${grid ? ' grid' : ''}`}
               ref={boardRef}
-              style={{ ['--card-h' as string]: `${settings.cardHeight}px` }}
+              style={{ ['--card-h' as string]: `${cardHeight}px` }}
               onClick={(e) => e.target === e.currentTarget && setSelection(new Set())}
             >
               {columns.map((col) => (
@@ -544,8 +583,8 @@ export default function App() {
                   dragging={colDrag?.id === col.printer.id}
                   dropTarget={overCol === col.printer.id}
                   selected={selected === col.printer.id}
-                  grid={settings.layout === 'grid'}
-                  cardHeight={settings.cardHeight}
+                  grid={grid}
+                  cardHeight={cardHeight}
                   selection={selection}
                   onSelect={setSelected}
                   onSelectJob={selectJob}

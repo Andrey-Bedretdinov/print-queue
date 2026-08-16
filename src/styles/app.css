@@ -634,6 +634,8 @@ input {
   align-content: start;
   overflow-x: hidden;
   overflow-y: auto;
+  /* Место под скроллбар зарезервировано, иначе авто-высота начинает «дышать». */
+  scrollbar-gutter: stable;
 }
 
 .board.grid .col {

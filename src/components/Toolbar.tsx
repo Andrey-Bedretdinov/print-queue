@@ -15,8 +15,10 @@ interface Props {
   onPicker: () => void
   onToggleSim: () => void
   onToggleRail: () => void
+  cardHeight: number
   onLayout: (value: 'board' | 'grid') => void
   onCardHeight: (value: number) => void
+  onCardAuto: () => void
   children?: ReactNode
 }
 
@@ -41,8 +43,10 @@ export function Toolbar({
   onPicker,
   onToggleSim,
   onToggleRail,
+  cardHeight,
   onLayout,
   onCardHeight,
+  onCardAuto,
   children,
 }: Props) {
   const grid = settings.layout === 'grid'
@@ -82,18 +86,26 @@ export function Toolbar({
         <span className="stepper">
           <button
             className="icon-btn"
-            disabled={settings.cardHeight <= CARD_MIN}
-            onClick={() => onCardHeight(Math.max(CARD_MIN, settings.cardHeight - CARD_STEP))}
+            disabled={!settings.cardAuto && cardHeight <= CARD_MIN}
+            onClick={() => onCardHeight(Math.max(CARD_MIN, cardHeight - CARD_STEP))}
           >
             <IcoMinus size={12} />
           </button>
-          <b>{settings.cardHeight}</b>
+          <b>{cardHeight}</b>
           <button
             className="icon-btn"
-            disabled={settings.cardHeight >= CARD_MAX}
-            onClick={() => onCardHeight(Math.min(CARD_MAX, settings.cardHeight + CARD_STEP))}
+            disabled={!settings.cardAuto && cardHeight >= CARD_MAX}
+            onClick={() => onCardHeight(Math.min(CARD_MAX, cardHeight + CARD_STEP))}
           >
             <IcoPlus size={12} />
+          </button>
+          <button
+            className={`chip tip${settings.cardAuto ? ' on' : ''}`}
+            data-tip="Подгонять под окно"
+            style={{ height: 18, padding: '0 6px', fontSize: 10 }}
+            onClick={onCardAuto}
+          >
+            Авто
           </button>
         </span>
       )}

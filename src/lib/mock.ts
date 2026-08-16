@@ -139,7 +139,7 @@ const incidents: Incident[] = [
 
 const settings: Settings = {
   theme: 'light',
-  simulation: true,
+  simulation: false,
   pollMs: 2500,
   railCollapsed: false,
   compact: false,
@@ -147,6 +147,7 @@ const settings: Settings = {
   order: [],
   layout: 'board',
   cardHeight: 240,
+  cardAuto: true,
 }
 
 const state: AppState = { printers, jobs, incidents, settings, systemAvailable: true }

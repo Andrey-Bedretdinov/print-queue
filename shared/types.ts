@@ -106,6 +106,8 @@ export interface Settings {
   layout: 'board' | 'grid'
   /** Высота блока очереди в режиме сетки, px. */
   cardHeight: number
+  /** Подгонять высоту блоков под окно, чтобы не оставалось пустого места. */
+  cardAuto: boolean
 }
 
 export interface AppState {

@@ -36,14 +36,24 @@ export class PrintManager {
     this.sim.onComplete = (job) => this.resolveBySignature(job)
   }
 
-  start() {
+  private seeded = false
+
+  /** Демо-очереди появляются только когда эмуляция включена. */
+  private ensureSeed() {
+    if (this.seeded) return
+    this.seeded = true
     this.sim.seed(ensureSamples())
     for (const job of this.sim.jobs) {
       if (job.state !== 'error') continue
       const printer = this.sim.printers.find((p) => p.id === job.printerId)
       if (printer) this.openIncident(job, printer)
     }
+  }
+
+  start() {
+    if (store.settings.simulation) this.ensureSeed()
     this.timer = setInterval(() => {
+      if (!store.settings.simulation) return
       this.sim.tick()
       this.push()
     }, 250)
@@ -63,10 +73,13 @@ export class PrintManager {
       ? [...this.sim.printers.map(stripProfile), ...this.sysPrinters]
       : this.sysPrinters
     const jobs = store.settings.simulation ? [...this.sim.jobs, ...this.sysJobs] : this.sysJobs
+    const incidents = store.settings.simulation
+      ? store.incidents
+      : store.incidents.filter((i) => !i.printerId.startsWith('sim:'))
     return {
       printers,
       jobs,
-      incidents: store.incidents,
+      incidents,
       settings: store.settings,
       systemAvailable: this.systemAvailable,
     }
@@ -324,6 +337,7 @@ export class PrintManager {
 
   updateSettings(patch: Partial<Settings>) {
     const next = store.patchSettings(patch)
+    if (next.simulation) this.ensureSeed()
     if (patch.pollMs && this.poller) {
       clearInterval(this.poller)
       this.poller = setInterval(() => this.pollSystem(), Math.max(1500, next.pollMs))

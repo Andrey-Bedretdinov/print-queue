@@ -22,13 +22,20 @@ jobs:
 
       - run: npm ci
 
+      # Подпись включается сама, если в секретах репозитория лежит сертификат:
+      # CSC_LINK — base64 файла .pfx, CSC_KEY_PASSWORD — пароль к нему.
+      # Без них сборка просто остаётся неподписанной.
       - run: npm run dist
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: print-queue-windows
           path: |
             release/*.exe
+            release/*.zip
             release/latest.yml
 
       - name: Publish release
@@ -39,5 +46,6 @@ jobs:
           generate_release_notes: true
           files: |
             release/*.exe
+            release/*.zip
             release/*.blockmap
             release/latest.yml

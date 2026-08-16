@@ -21,7 +21,7 @@ interface Persisted {
 const DEFAULTS: Persisted = {
   settings: {
     theme: 'light',
-    simulation: true,
+    simulation: false,
     pollMs: 2500,
     railCollapsed: false,
     compact: false,
@@ -29,6 +29,7 @@ const DEFAULTS: Persisted = {
     order: [],
     layout: 'board',
     cardHeight: 240,
+    cardAuto: true,
   },
   incidents: [],
   order: {},

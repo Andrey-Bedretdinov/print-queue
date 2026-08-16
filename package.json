@@ -1,6 +1,6 @@
 {
   "name": "print-queue",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Compact print queue manager for Windows 10/11",
   "author": {
     "name": "Andrey Bedretdinov",
@@ -57,21 +57,29 @@
     ],
     "win": {
       "icon": "build/icon.png",
+      "artifactName": "PrintQueue-${version}-win-${arch}.${ext}",
+      "signtoolOptions": {
+        "publisherName": "Andrey Bedretdinov"
+      },
+      "legalTrademarks": "MIT License",
+      "requestedExecutionLevel": "asInvoker",
+      "signAndEditExecutable": true,
       "target": [
         { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        { "target": "zip", "arch": ["x64"] }
       ]
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": false,
+      "perMachine": true,
+      "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
       "shortcutName": "Очередь печати",
+      "runAfterFinish": true,
       "artifactName": "PrintQueue-${version}-setup.${ext}"
     },
-    "portable": {
-      "artifactName": "PrintQueue-${version}-portable.${ext}"
-    }
+    "compression": "normal"
   }
 }
