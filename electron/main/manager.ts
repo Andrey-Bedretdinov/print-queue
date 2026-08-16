@@ -336,7 +336,9 @@ export class PrintManager {
       const { printer: sourceName, id } = jobRef(jobId)
       // Переносим сам спул-файл: это работает и для заданий из чужих программ.
       const res = await moveSpoolJob(sourceName, id, target.name)
-      void this.pollSystem()
+      // Ответ уходит в интерфейс уже с обновлённой очередью: иначе он успевает
+      // отрисовать дореносное состояние и задание прыгает обратно.
+      await this.pollSystem()
       if (res.ok) return { ok: true }
 
       const code = res.error?.split('|')[0]

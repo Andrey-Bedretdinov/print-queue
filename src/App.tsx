@@ -48,6 +48,7 @@ export default function App() {
   const [drag, setDrag] = useState<Job | null>(null)
   const [colDrag, setColDrag] = useState<Printer | null>(null)
   const [override, setOverride] = useState<Record<string, string[]> | null>(null)
+  const [settling, setSettling] = useState<{ ids: string[]; to: string } | null>(null)
   const [overCol, setOverCol] = useState<string | null>(null)
   const [fileOver, setFileOver] = useState(false)
   const [selection, setSelection] = useState<Set<string>>(new Set())
@@ -87,6 +88,38 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = state?.settings.theme ?? 'light'
   }, [state?.settings.theme])
+
+  /**
+   * После переноса очередь какое-то время отдаёт ещё дореносное состояние.
+   * Оптимистичная раскладка снимается, только когда сервер и сам считает, что
+   * задание переехало: либо оно уже на целевом принтере, либо исчезло — перенос
+   * заводит на приёмнике новый номер, а старый удаляет.
+   */
+  useEffect(() => {
+    if (!settling || !state) return
+    const settled = settling.ids.every((id) => {
+      const job = state.jobs.find((j) => j.id === id)
+      return (
+        !job ||
+        job.printerId === settling.to ||
+        job.state === 'canceled' ||
+        job.state === 'completed'
+      )
+    })
+    if (!settled) return
+    setSettling(null)
+    setOverride(null)
+  }, [state, settling])
+
+  /** Страховка: если подтверждение так и не пришло, раскладка не залипает навсегда. */
+  useEffect(() => {
+    if (!settling) return
+    const timer = setTimeout(() => {
+      setSettling(null)
+      setOverride(null)
+    }, 20_000)
+    return () => clearTimeout(timer)
+  }, [settling])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -175,11 +208,16 @@ export default function App() {
 
   const columns = useMemo<ColumnView[]>(() => {
     if (!override) return baseColumns
+    const listed = new Set(Object.values(override).flat())
     return baseColumns.map((col) => {
       const ids = override[col.printer.id]
       if (!ids) return col
       const jobs = ids.map((id) => jobMap.get(id)).filter((j): j is Job => !!j)
-      return { printer: col.printer, jobs }
+      // Перенос заводит на целевом принтере задание с новым номером, а старое
+      // удаляет. В раскладке этот номер не значится, и без такой добавки строка
+      // пропадала бы на миг между «перенесли» и «спулер подтвердил».
+      const fresh = col.jobs.filter((j) => !listed.has(j.id))
+      return { printer: col.printer, jobs: [...jobs, ...fresh] }
     })
   }, [baseColumns, override, jobMap])
 
@@ -284,6 +322,9 @@ export default function App() {
     setMenu(null)
     dragRef.current = true
     setDrag(job)
+    // Новый захват задаёт раскладку заново — ждать подтверждения по прошлому
+    // переносу больше незачем, иначе оно снимет уже чужую раскладку.
+    setSettling(null)
     setOverride(snapshot())
   }
 
@@ -381,11 +422,14 @@ export default function App() {
         : (jobMap.get(jobId)?.name ?? 'Задание')
       pushToast('info', label, `→ ${target?.name ?? ''}`)
     }
-    setOverride(null)
     if (pendingRef.current) {
       setState(pendingRef.current)
       pendingRef.current = null
     }
+    // Раскладку держим, пока спулер не отчитается: очередь опрашивается не в
+    // такт с переносом, и сброс сразу возвращал задание в старый блок на секунду.
+    if (res?.ok) setSettling({ ids: [jobId, ...others], to })
+    else setOverride(null)
   }
 
   function pushToast(
