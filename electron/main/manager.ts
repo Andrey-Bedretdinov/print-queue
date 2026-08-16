@@ -124,10 +124,10 @@ export class PrintManager {
   version = '0.0.0'
   private canMoveSystem = false
 
-  /** Проверяем доступ к спул-каталогу — от него зависит перенос чужих заданий. */
+  /** Проверяем права: без администратора чужие задания не перенести. */
   private async checkSpoolAccess() {
     const next = await canMoveSystemJobs()
-    log(`запуск ${this.version}, спул-каталог ${next ? 'читается' : 'недоступен'}`)
+    log(`запуск ${this.version}, права администратора ${next ? 'есть' : 'нет'}`)
     if (next === this.canMoveSystem) return
     this.canMoveSystem = next
     this.markDirty()
@@ -335,7 +335,7 @@ export class PrintManager {
       }
       const { printer: sourceName, id } = jobRef(jobId)
       // Переносим сам спул-файл: это работает и для заданий из чужих программ.
-      const res = await moveSpoolJob(sourceName, id, target.name, job.bytes)
+      const res = await moveSpoolJob(sourceName, id, target.name)
       void this.pollSystem()
       if (res.ok) return { ok: true }
 
@@ -346,7 +346,7 @@ export class PrintManager {
         reason: code && code !== reason ? `${reason} · ${code}` : reason,
         needsAdmin: reason === 'Нужны права администратора',
         // Очередь у принтера выключена — предложим включить её одной кнопкой.
-        needsSpooling: code === 'no-spool-file' ? job.printerId : undefined,
+        needsSpooling: code === 'no-spool-data' ? job.printerId : undefined,
       }
     }
 
