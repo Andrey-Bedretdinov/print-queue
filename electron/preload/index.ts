@@ -28,17 +28,19 @@ const api = {
   },
   jobAction: (jobId: string, kind: JobActionKind): Promise<boolean> =>
     ipcRenderer.invoke(IPC.invoke.jobAction, jobId, kind),
+  renamePrinter: (printerId: string, name: string): Promise<{ ok: boolean; reason?: string }> =>
+    ipcRenderer.invoke(IPC.invoke.rename, printerId, name),
+  elevate: (): Promise<boolean> => ipcRenderer.invoke(IPC.invoke.elevate),
   moveJob: (
     jobId: string,
     printerId: string,
     position: number,
-  ): Promise<{ ok: boolean; reason?: string }> =>
+  ): Promise<{ ok: boolean; reason?: string; needsAdmin?: boolean }> =>
     ipcRenderer.invoke(IPC.invoke.moveJob, jobId, printerId, position),
   printerAction: (printerId: string, kind: PrinterActionKind): Promise<boolean> =>
     ipcRenderer.invoke(IPC.invoke.printerAction, printerId, kind),
   addFiles: (paths: string[], printerId: string): Promise<{ ok: boolean; added: number }> =>
     ipcRenderer.invoke(IPC.invoke.addFiles, paths, printerId),
-  pickFiles: (): Promise<string[]> => ipcRenderer.invoke(IPC.invoke.pickFiles),
   preview: (path: string): Promise<PreviewPayload> => ipcRenderer.invoke(IPC.invoke.preview, path),
   openExternal: (path: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.invoke.openExternal, path),

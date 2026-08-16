@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ToastMessage } from '../../shared/ipc'
+import { api } from '../lib/api'
 import { IcoX } from './icons'
 
 interface Props {
@@ -25,6 +26,15 @@ export function Toasts({ items, onClose }: Props) {
             <span className="toast-main">
               <b>{t.text}</b>
               {t.sub && <i>{t.sub}</i>}
+              {t.action === 'elevate' && (
+                <button
+                  className="btn btn-soft"
+                  style={{ height: 20, marginTop: 4, fontSize: 11 }}
+                  onClick={() => api.elevate()}
+                >
+                  Перезапустить от администратора
+                </button>
+              )}
             </span>
             <button className="icon-btn" style={{ width: 18, height: 18 }} onClick={() => onClose(t.id)}>
               <IcoX size={10} />

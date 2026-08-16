@@ -9,12 +9,13 @@ export const IPC = {
     moveJob: 'pq:move-job',
     printerAction: 'pq:printer-action',
     addFiles: 'pq:add-files',
-    pickFiles: 'pq:pick-files',
     preview: 'pq:preview',
     openExternal: 'pq:open-external',
     incident: 'pq:incident',
     settings: 'pq:settings',
     window: 'pq:window',
+    rename: 'pq:rename-printer',
+    elevate: 'pq:elevate',
   },
 } as const
 
@@ -28,4 +29,6 @@ export interface ToastMessage {
   kind: 'ok' | 'warn' | 'error' | 'info'
   text: string
   sub?: string
+  /** Кнопка в тосте: перезапуск приложения с правами администратора. */
+  action?: 'elevate'
 }

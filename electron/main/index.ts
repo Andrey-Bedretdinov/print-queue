@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, nativeTheme } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, protocol, net, nativeTheme } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { IPC } from '../../shared/ipc'
@@ -7,6 +7,7 @@ import type { AppState, Settings } from '../../shared/types'
 import { initStore, store } from './store'
 import { PrintManager } from './manager'
 import { buildPreview } from './preview'
+import { psRun } from './powershell'
 
 process.env.APP_ROOT = join(__dirname, '..', '..')
 const DEV_URL = process.env.VITE_DEV_SERVER_URL
@@ -121,19 +122,6 @@ ipcMain.handle(IPC.invoke.addFiles, (_e, paths: string[], printerId: string) =>
   manager?.addFiles(paths, printerId),
 )
 
-ipcMain.handle(IPC.invoke.pickFiles, async () => {
-  if (!win) return []
-  const res = await dialog.showOpenDialog(win, {
-    title: 'Файлы для печати',
-    properties: ['openFile', 'multiSelections'],
-    filters: [
-      { name: 'Документы', extensions: ['pdf', 'docx', 'doc', 'xlsx', 'txt', 'png', 'jpg', 'jpeg'] },
-      { name: 'Все файлы', extensions: ['*'] },
-    ],
-  })
-  return res.canceled ? [] : res.filePaths
-})
-
 ipcMain.handle(IPC.invoke.preview, (_e, path: string) => buildPreview(path))
 
 ipcMain.handle(IPC.invoke.openExternal, async (_e, path: string) => {
@@ -148,6 +136,22 @@ ipcMain.handle(IPC.invoke.incident, (_e, kind: string, id?: string, printerId?: 
 ipcMain.handle(IPC.invoke.settings, (_e, patch: Partial<Settings>) => {
   if (patch.theme) nativeTheme.themeSource = patch.theme
   return manager?.updateSettings(patch)
+})
+
+ipcMain.handle(IPC.invoke.rename, (_e, printerId: string, name: string) =>
+  manager?.renamePrinter(printerId, name),
+)
+
+/** Перезапуск с правами администратора — нужен для переноса чужих заданий. */
+ipcMain.handle(IPC.invoke.elevate, async () => {
+  const exe = process.execPath
+  const args = app.isPackaged ? '' : ` -ArgumentList '${app.getAppPath().replace(/'/g, "''")}'`
+  const ok = await psRun(
+    `Start-Process -FilePath '${exe.replace(/'/g, "''")}' -Verb RunAs${args}`,
+    30000,
+  )
+  if (ok) setTimeout(() => app.quit(), 500)
+  return ok
 })
 
 ipcMain.handle(IPC.invoke.window, (_e, kind: string) => {

@@ -35,7 +35,7 @@ interface RawJob {
  * One PowerShell round-trip for everything: printers, their TCP/IP ports and
  * every spooled job. Polling three separate cmdlets was visibly slower.
  */
-const SCRIPT = `
+export const SCRIPT = `
 $ErrorActionPreference='SilentlyContinue'
 $ports = @{}
 foreach ($p in (Get-CimInstance Win32_TCPIPPrinterPort)) { $ports[$p.Name] = $p.HostAddress }
@@ -134,9 +134,17 @@ export function idFor(name: string) {
   return 'sys:' + name.replace(/[^\w.-]+/g, '_').toLowerCase()
 }
 
+export interface RawSnapshot {
+  printers: RawPrinter[] | RawPrinter
+  jobs: RawJob[] | RawJob
+}
+
 export async function readSystem(): Promise<{ printers: Printer[]; jobs: Job[] } | null> {
-  const raw = await psJson<{ printers: RawPrinter[] | RawPrinter; jobs: RawJob[] | RawJob }>(SCRIPT)
-  if (!raw) return null
+  const raw = await psJson<RawSnapshot>(SCRIPT, 25000)
+  return raw ? parseSystem(raw) : null
+}
+
+export function parseSystem(raw: RawSnapshot): { printers: Printer[]; jobs: Job[] } {
   const rawPrinters = raw.printers ? (Array.isArray(raw.printers) ? raw.printers : [raw.printers]) : []
   const rawJobs = raw.jobs ? (Array.isArray(raw.jobs) ? raw.jobs : [raw.jobs]) : []
 
@@ -220,7 +228,7 @@ export async function readSystem(): Promise<{ printers: Printer[]; jobs: Job[] }
 }
 
 /** Job ids are `sys:<printer name>:<job id>`; the name itself may contain ':'. */
-function jobRef(jobId: string) {
+export function jobRef(jobId: string) {
   const body = jobId.slice(4)
   const cut = body.lastIndexOf(':')
   return { printer: body.slice(0, cut), id: Number(body.slice(cut + 1)) }
@@ -245,6 +253,10 @@ export async function systemPrinterAction(name: string, kind: 'pause' | 'resume'
       `if (-not $p) { exit 1 }; ` +
       `$null = Invoke-CimMethod -InputObject $p -MethodName ${method}`,
   )
+}
+
+export async function renameSystemPrinter(oldName: string, newName: string) {
+  return psRun(`Rename-Printer -Name '${psq(oldName)}' -NewName '${psq(newName)}' -ErrorAction Stop`)
 }
 
 /** Sends a file to a named printer through the shell's PrintTo verb. */

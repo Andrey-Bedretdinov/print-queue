@@ -8,11 +8,16 @@ import { ensureSamples } from './samples'
 import { estimatePages } from './preview'
 import { store } from './store'
 import {
+  idFor,
+  jobRef,
   readSystem,
+  renameSystemPrinter,
   systemJobAction,
   systemPrintFile,
   systemPrinterAction,
 } from './windows-source'
+import { explain, moveSpoolJob } from './spool'
+import { SpoolWatcher } from './watcher'
 
 type Emit = (state: AppState) => void
 type Toast = (toast: ToastMessage) => void
@@ -24,7 +29,7 @@ export class PrintManager {
   private sysSeen = new Map<string, Job['state']>()
   private systemAvailable = false
   private timer: NodeJS.Timeout | null = null
-  private poller: NodeJS.Timeout | null = null
+  private watcher: SpoolWatcher | null = null
   private polling = false
   private dirty = true
 
@@ -57,13 +62,34 @@ export class PrintManager {
       this.sim.tick()
       this.push()
     }, 250)
-    this.pollSystem()
-    this.poller = setInterval(() => this.pollSystem(), Math.max(1500, store.settings.pollMs))
+    this.watcher = new SpoolWatcher(
+      Math.max(600, Math.min(store.settings.pollMs, 4000)),
+      (data) => this.applySnapshot(data),
+      (hard) => this.onSpoolerSilence(hard),
+    )
+    this.watcher.start()
+    void this.pollSystem()
   }
 
   stop() {
     if (this.timer) clearInterval(this.timer)
-    if (this.poller) clearInterval(this.poller)
+    this.watcher?.stop()
+  }
+
+  /**
+   * Спулер молчит: сначала помечаем связь потерянной, а если тишина затянулась —
+   * убираем задания, чтобы в окне не висели уже напечатанные файлы.
+   */
+  private onSpoolerSilence(hard: boolean) {
+    if (!this.systemAvailable && !hard) return
+    this.systemAvailable = false
+    if (hard && this.sysJobs.length) {
+      this.sysJobs = []
+      this.sysSeen.clear()
+      this.lastKnown.clear()
+    }
+    this.markDirty()
+    this.push(true)
   }
 
   // ---------------------------------------------------------------- state
@@ -111,9 +137,30 @@ export class PrintManager {
         this.systemAvailable = false
         return
       }
+      this.applySnapshot(data)
+    } finally {
+      this.polling = false
+    }
+  }
+
+  private applySnapshot(data: { printers: Printer[]; jobs: Job[] }) {
       this.systemAvailable = true
       this.sysPrinters = data.printers
-      this.sysJobs = data.jobs
+      // Спулер иногда держит напечатанное задание в списке (например, когда у
+      // принтера включено «сохранять документы после печати»). В очереди такому
+      // заданию делать нечего — убираем через минуту после завершения.
+      const now = Date.now()
+      const done = (j: Job) => j.state === 'completed' || j.state === 'canceled'
+      for (const job of data.jobs) {
+        if (done(job)) {
+          if (!this.finishedAt.has(job.id)) this.finishedAt.set(job.id, now)
+        } else {
+          this.finishedAt.delete(job.id)
+        }
+      }
+      const live = new Set(data.jobs.map((j) => j.id))
+      for (const id of [...this.finishedAt.keys()]) if (!live.has(id)) this.finishedAt.delete(id)
+      this.sysJobs = data.jobs.filter((j) => !done(j) || now - (this.finishedAt.get(j.id) ?? now) < 60_000)
       const alive = new Set<string>()
       for (const job of data.jobs) {
         alive.add(job.id)
@@ -143,12 +190,10 @@ export class PrintManager {
       this.lastKnown = new Map(data.jobs.map((j) => [j.id, j]))
       this.markDirty()
       this.push(true)
-    } finally {
-      this.polling = false
-    }
   }
 
   private lastKnown = new Map<string, Job>()
+  private finishedAt = new Map<string, number>()
 
   // ------------------------------------------------------------ incidents
 
@@ -262,16 +307,16 @@ export class PrintManager {
     if (jobId.startsWith('sys:')) {
       const job = this.sysJobs.find((j) => j.id === jobId)
       if (!job) return { ok: false, reason: 'Задание уже ушло из очереди' }
-      if (!job.path) {
-        return {
-          ok: false,
-          reason: 'Windows не отдаёт файл чужого задания — перенос невозможен',
-        }
+      if (target.source !== 'system') {
+        return { ok: false, reason: 'Задание Windows переносится только на реальный принтер' }
       }
-      await systemJobAction(jobId, 'cancel')
-      await systemPrintFile(job.path, target.name)
+      const { printer: sourceName, id } = jobRef(jobId)
+      // Переносим сам спул-файл: это работает и для заданий из чужих программ.
+      const res = await moveSpoolJob(sourceName, id, target.name)
       void this.pollSystem()
-      return { ok: true }
+      if (res.ok) return { ok: true }
+      const reason = explain(res.error)
+      return { ok: false, reason, needsAdmin: reason === 'Нужны права администратора' }
     }
 
     if (target.source === 'system') {
@@ -335,13 +380,46 @@ export class PrintManager {
     return { ok: added > 0, added }
   }
 
+  /** Переименование принтера — системного через спулер, виртуального в памяти. */
+  async renamePrinter(printerId: string, name: string) {
+    const clean = name.trim()
+    if (!clean) return { ok: false, reason: 'Пустое имя' }
+
+    const sim = this.sim.printers.find((p) => p.id === printerId)
+    if (sim) {
+      sim.name = clean
+      this.markDirty()
+      this.push(true)
+      return { ok: true }
+    }
+
+    const sys = this.sysPrinters.find((p) => p.id === printerId)
+    if (!sys) return { ok: false, reason: 'Принтер не найден' }
+    if (sys.name === clean) return { ok: true }
+    const ok = await renameSystemPrinter(sys.name, clean)
+    if (!ok) return { ok: false, reason: 'Windows не дал переименовать — нужны права' }
+
+    // Идентификатор принтера собран из имени: переносим настройки на новый.
+    const nextId = idFor(clean)
+    const swap = (list: string[]) => list.map((x) => (x === printerId ? nextId : x))
+    store.patchSettings({
+      hidden: swap(store.settings.hidden),
+      order: swap(store.settings.order),
+    })
+    for (const incident of store.incidents) {
+      if (incident.printerId === printerId) {
+        incident.printerId = nextId
+        incident.printerName = clean
+      }
+    }
+    store.incidents = [...store.incidents]
+    void this.pollSystem()
+    return { ok: true }
+  }
+
   updateSettings(patch: Partial<Settings>) {
     const next = store.patchSettings(patch)
     if (next.simulation) this.ensureSeed()
-    if (patch.pollMs && this.poller) {
-      clearInterval(this.poller)
-      this.poller = setInterval(() => this.pollSystem(), Math.max(1500, next.pollMs))
-    }
     this.markDirty()
     this.push(true)
     return next

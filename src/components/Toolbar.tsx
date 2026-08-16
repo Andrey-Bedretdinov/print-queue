@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Settings } from '../../shared/types'
 import { IcoBoard, IcoGrid, IcoList, IcoMinus, IcoPlus, IcoRail } from './icons'
+// IcoPlus остаётся для шага размера блока в режиме сетки.
 
 export type Filter = 'all' | 'active' | 'error'
 
@@ -11,7 +12,6 @@ interface Props {
   settings: Settings
   systemAvailable: boolean
   pickerOpen: boolean
-  onAdd: () => void
   onPicker: () => void
   onToggleSim: () => void
   onToggleRail: () => void
@@ -39,7 +39,6 @@ export function Toolbar({
   settings,
   systemAvailable,
   pickerOpen,
-  onAdd,
   onPicker,
   onToggleSim,
   onToggleRail,
@@ -109,11 +108,6 @@ export function Toolbar({
           </button>
         </span>
       )}
-      <div className="divider" />
-      <button className="btn btn-primary" onClick={onAdd}>
-        <IcoPlus size={12} />
-        Файлы
-      </button>
       <div className="divider" />
       {FILTERS.map(([value, label]) => (
         <button

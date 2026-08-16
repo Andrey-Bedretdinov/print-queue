@@ -367,7 +367,7 @@ export default function App() {
     for (const id of others) await api.moveJob(id, to, Number.MAX_SAFE_INTEGER)
     if (others.length) setSelection(new Set())
     if (!res?.ok) {
-      pushToast('warn', 'Перенос не выполнен', res?.reason)
+      pushToast('warn', 'Перенос не выполнен', res?.reason, res?.needsAdmin ? 'elevate' : undefined)
     } else if (from !== to) {
       const target = state?.printers.find((p) => p.id === to)
       const label = others.length
@@ -382,10 +382,15 @@ export default function App() {
     }
   }
 
-  function pushToast(kind: ToastMessage['kind'], text: string, sub?: string) {
-    const toast: ToastMessage = { id: Math.random().toString(36).slice(2), kind, text, sub }
+  function pushToast(
+    kind: ToastMessage['kind'],
+    text: string,
+    sub?: string,
+    action?: ToastMessage['action'],
+  ) {
+    const toast: ToastMessage = { id: Math.random().toString(36).slice(2), kind, text, sub, action }
     setToasts((prev) => [...prev.slice(-3), toast])
-    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== toast.id)), 5000)
+    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== toast.id)), action ? 15000 : 5000)
   }
 
   // -------------------------------------------------------------- actions
@@ -399,16 +404,6 @@ export default function App() {
       else pushToast('warn', 'Не удалось добавить файлы', printer?.name)
     },
     [state?.printers],
-  )
-
-  const pickFiles = useCallback(
-    async (printerId?: string) => {
-      const target = printerId ?? selected ?? visiblePrinters[0]?.id
-      if (!target) return
-      const paths = await api.pickFiles()
-      await addFiles(paths, target)
-    },
-    [addFiles, selected, visiblePrinters],
   )
 
   const focusPrinter = (id: string) => {
@@ -458,13 +453,19 @@ export default function App() {
     const target = state?.printers.find((p) => p.id === printerId)
     let moved = 0
     let reason: string | undefined
+    let needsAdmin = false
     for (const id of jobIds) {
       const res = await api.moveJob(id, printerId, Number.MAX_SAFE_INTEGER)
       if (res?.ok) moved += 1
-      else reason = res?.reason
+      else {
+        reason = res?.reason
+        needsAdmin = needsAdmin || !!res?.needsAdmin
+      }
     }
     if (moved) pushToast('info', `${moved} задание(й) → ${target?.name ?? ''}`)
-    if (moved < jobIds.length) pushToast('warn', 'Часть заданий осталась', reason)
+    if (moved < jobIds.length) {
+      pushToast('warn', 'Часть заданий осталась', reason, needsAdmin ? 'elevate' : undefined)
+    }
     setSelection(new Set())
   }
 
@@ -525,7 +526,6 @@ export default function App() {
           settings={settings}
           systemAvailable={state.systemAvailable}
           pickerOpen={picker}
-          onAdd={() => pickFiles()}
           onPicker={() => setPicker((v) => !v)}
           onToggleSim={() => api.settings({ simulation: !settings.simulation })}
           onToggleRail={() => api.settings({ railCollapsed: !settings.railCollapsed })}
@@ -591,7 +591,6 @@ export default function App() {
                   onMenuJob={openMenu}
                   onPreview={setPreview}
                   onDropFiles={addFiles}
-                  onAdd={() => pickFiles(col.printer.id)}
                 />
               ))}
               {columns.length === 0 && (

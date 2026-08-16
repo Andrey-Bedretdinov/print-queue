@@ -230,8 +230,15 @@ export const mockApi: PqApi = {
     emit()
     return true
   },
+  renamePrinter: async (id, name) => {
+    const p = printers.find((x) => x.id === id)
+    if (!p) return { ok: false, reason: 'нет принтера' }
+    p.name = name
+    emit()
+    return { ok: true }
+  },
+  elevate: async () => false,
   addFiles: async () => ({ ok: true, added: 1 }),
-  pickFiles: async () => [],
   preview: async (path) => ({
     kind: 'text',
     name: path.split('/').pop() ?? path,

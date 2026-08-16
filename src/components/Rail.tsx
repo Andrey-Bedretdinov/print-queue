@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import type { ConnectionKind, Printer } from '../../shared/types'
 import type { ColumnView } from '../App'
+import { api } from '../lib/api'
 import { hasFiles, pathsFrom } from '../lib/files'
 import { IcoNet, IcoPrinter, IcoUsb } from './icons'
 
@@ -65,9 +66,21 @@ interface ItemProps {
 function RailItem({ printer, count, errors, selected, collapsed, onSelect, onDropFiles }: ItemProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `rail:${printer.id}` })
   const [fileOver, setFileOver] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(printer.name)
+
+  const commit = async () => {
+    setEditing(false)
+    const next = draft.trim()
+    if (!next || next === printer.name) return
+    const res = await api.renamePrinter(printer.id, next)
+    if (!res?.ok) setDraft(printer.name)
+  }
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       ref={setNodeRef}
       className={`rail-item${selected ? ' sel' : ''}${isOver || fileOver ? ' drop' : ''}`}
       onClick={() => onSelect(printer.id)}
@@ -88,7 +101,36 @@ function RailItem({ printer, count, errors, selected, collapsed, onSelect, onDro
     >
       <span className={`led ${printer.state}`} />
       <span className="rail-name">
-        <b>{printer.name}</b>
+        {editing ? (
+          <input
+            className="rename"
+            value={draft}
+            autoFocus
+            spellCheck={false}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit()
+              if (e.key === 'Escape') {
+                setDraft(printer.name)
+                setEditing(false)
+              }
+              e.stopPropagation()
+            }}
+          />
+        ) : (
+          <b
+            title="Нажмите, чтобы переименовать"
+            onClick={(e) => {
+              e.stopPropagation()
+              setDraft(printer.name)
+              setEditing(true)
+            }}
+          >
+            {printer.name}
+          </b>
+        )}
         <i>{printer.detail ?? printer.address}</i>
         {printer.consumables.length > 0 && (
           <span className="ink">
@@ -106,6 +148,6 @@ function RailItem({ printer, count, errors, selected, collapsed, onSelect, onDro
         )}
       </span>
       {count > 0 && <span className={`badge${errors ? ' red' : ' blue'}`}>{count}</span>}
-    </button>
+    </div>
   )
 }

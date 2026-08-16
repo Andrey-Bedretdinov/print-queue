@@ -22,7 +22,7 @@ const DEFAULTS: Persisted = {
   settings: {
     theme: 'light',
     simulation: false,
-    pollMs: 2500,
+    pollMs: 1200,
     railCollapsed: false,
     compact: false,
     hidden: [],
