@@ -862,6 +862,8 @@ input {
   margin: 4px;
   flex: 1;
   min-height: 60px;
+  width: calc(100% - 8px);
+  font-size: 11px;
   border: 1px dashed var(--line-strong);
   border-radius: var(--radius);
   display: grid;
@@ -871,7 +873,8 @@ input {
     background var(--fast) var(--ease);
 }
 
-.col.over .empty {
+.col.over .empty,
+.empty:hover {
   border-color: var(--primary);
   color: var(--primary);
   background: var(--primary-softer);

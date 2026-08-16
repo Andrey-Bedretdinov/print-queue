@@ -9,6 +9,7 @@ interface RawPrinter {
   Location: string | null
   Comment: string | null
   Default: boolean
+  Attributes: number
   WorkOffline: boolean
   PrinterState: number
   PrinterStatus: number
@@ -49,6 +50,7 @@ $printers = @(Get-CimInstance Win32_Printer | ForEach-Object {
     Location = $_.Location
     Comment = $_.Comment
     Default = [bool]$_.Default
+    Attributes = [int]$_.Attributes
     WorkOffline = [bool]$_.WorkOffline
     PrinterState = [int]$_.PrinterState
     PrinterStatus = [int]$_.PrinterStatus
@@ -171,6 +173,8 @@ export function parseSystem(raw: RawSnapshot): { printers: Printer[]; jobs: Job[
       default: !!p.Default,
       color: caps.includes(2),
       duplex: caps.includes(4),
+      // PRINTER_ATTRIBUTE_DIRECT — печать мимо очереди, спул-файла не будет.
+      direct: ((p.Attributes | 0) & 0x2) !== 0,
       consumables: [],
       tray: 0,
       speed: 0,
@@ -252,6 +256,21 @@ export async function systemPrinterAction(name: string, kind: 'pause' | 'resume'
     `$p = Get-CimInstance Win32_Printer -Filter "Name='${psq(name).replace(/"/g, '')}'"; ` +
       `if (-not $p) { exit 1 }; ` +
       `$null = Invoke-CimMethod -InputObject $p -MethodName ${method}`,
+  )
+}
+
+/**
+ * Включает очередь печати: снимает «печатать напрямую» и просит спулер дождаться
+ * последней страницы. Без очереди на диске нет спул-файла, а значит нечего и
+ * переносить между принтерами.
+ */
+export async function enableSpooling(name: string) {
+  const filter = psq(name).replace(/"/g, '')
+  return psRun(
+    `$p = Get-CimInstance Win32_Printer -Filter "Name='${filter}'"; ` +
+      `if (-not $p) { exit 1 }; ` +
+      `$p.Attributes = (([int]$p.Attributes -bor 0x200) -band (-bnot 0x2)); ` +
+      `Set-CimInstance -InputObject $p -ErrorAction Stop`,
   )
 }
 

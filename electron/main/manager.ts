@@ -8,6 +8,7 @@ import { ensureSamples } from './samples'
 import { estimatePages } from './preview'
 import { store } from './store'
 import {
+  enableSpooling,
   idFor,
   jobRef,
   readSystem,
@@ -335,6 +336,8 @@ export class PrintManager {
         ok: false,
         reason: res.error && res.error !== reason ? `${reason} · ${res.error}` : reason,
         needsAdmin: reason === 'Нужны права администратора',
+        // Очередь у принтера выключена — предложим включить её одной кнопкой.
+        needsSpooling: res.error === 'no-spool-file' ? job.printerId : undefined,
       }
     }
 
@@ -397,6 +400,15 @@ export class PrintManager {
     this.markDirty()
     this.push(true)
     return { ok: added > 0, added }
+  }
+
+  /** Включает очередь печати у системного принтера — по кнопке в уведомлении. */
+  async enableSpooling(printerId: string) {
+    const sys = this.sysPrinters.find((p) => p.id === printerId)
+    if (!sys) return { ok: false, reason: 'Принтер не найден' }
+    const ok = await enableSpooling(sys.name)
+    void this.pollSystem()
+    return ok ? { ok: true } : { ok: false, reason: 'Нужны права администратора' }
   }
 
   /** Переименование принтера — системного через спулер, виртуального в памяти. */

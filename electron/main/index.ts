@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, protocol, net, nativeTheme } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, nativeTheme } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { IPC } from '../../shared/ipc'
@@ -123,6 +123,24 @@ ipcMain.handle(IPC.invoke.addFiles, (_e, paths: string[], printerId: string) =>
   manager?.addFiles(paths, printerId),
 )
 
+/**
+ * Приложение запускается с правами администратора, а проводник — без них, и
+ * Windows не разрешает перетаскивание между разными уровнями. Поэтому выбор
+ * файлов диалогом остаётся единственным надёжным способом добавить печать.
+ */
+ipcMain.handle(IPC.invoke.pickFiles, async () => {
+  if (!win) return []
+  const res = await dialog.showOpenDialog(win, {
+    title: 'Файлы для печати',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: 'Документы', extensions: ['pdf', 'docx', 'doc', 'xlsx', 'txt', 'png', 'jpg', 'jpeg'] },
+      { name: 'Все файлы', extensions: ['*'] },
+    ],
+  })
+  return res.canceled ? [] : res.filePaths
+})
+
 ipcMain.handle(IPC.invoke.preview, (_e, path: string) => buildPreview(path))
 
 ipcMain.handle(IPC.invoke.openExternal, async (_e, path: string) => {
@@ -141,6 +159,10 @@ ipcMain.handle(IPC.invoke.settings, (_e, patch: Partial<Settings>) => {
 
 ipcMain.handle(IPC.invoke.rename, (_e, printerId: string, name: string) =>
   manager?.renamePrinter(printerId, name),
+)
+
+ipcMain.handle(IPC.invoke.enableSpooling, (_e, printerId: string) =>
+  manager?.enableSpooling(printerId),
 )
 
 /** Перезапуск с правами администратора — нужен для переноса чужих заданий. */

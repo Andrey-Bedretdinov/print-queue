@@ -47,6 +47,8 @@ export interface Printer {
   default: boolean
   color: boolean
   duplex: boolean
+  /** Печать идёт мимо очереди — задания такого принтера нельзя перенести. */
+  direct?: boolean
   consumables: Consumable[]
   tray: number
   speed: number

@@ -367,7 +367,13 @@ export default function App() {
     for (const id of others) await api.moveJob(id, to, Number.MAX_SAFE_INTEGER)
     if (others.length) setSelection(new Set())
     if (!res?.ok) {
-      pushToast('warn', 'Перенос не выполнен', res?.reason, res?.needsAdmin ? 'elevate' : undefined)
+      pushToast(
+        'warn',
+        'Перенос не выполнен',
+        res?.reason,
+        res?.needsAdmin ? 'elevate' : res?.needsSpooling ? 'spool' : undefined,
+        res?.needsSpooling,
+      )
     } else if (from !== to) {
       const target = state?.printers.find((p) => p.id === to)
       const label = others.length
@@ -387,8 +393,16 @@ export default function App() {
     text: string,
     sub?: string,
     action?: ToastMessage['action'],
+    actionArg?: string,
   ) {
-    const toast: ToastMessage = { id: Math.random().toString(36).slice(2), kind, text, sub, action }
+    const toast: ToastMessage = {
+      id: Math.random().toString(36).slice(2),
+      kind,
+      text,
+      sub,
+      action,
+      actionArg,
+    }
     setToasts((prev) => [...prev.slice(-3), toast])
     setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== toast.id)), action ? 15000 : 5000)
   }
@@ -404,6 +418,15 @@ export default function App() {
       else pushToast('warn', 'Не удалось добавить файлы', printer?.name)
     },
     [state?.printers],
+  )
+
+  /** Диалог выбора файлов: перетаскивание из проводника блокирует UIPI. */
+  const pickFiles = useCallback(
+    async (printerId: string) => {
+      const paths = await api.pickFiles()
+      await addFiles(paths, printerId)
+    },
+    [addFiles],
   )
 
   const focusPrinter = (id: string) => {
@@ -454,17 +477,25 @@ export default function App() {
     let moved = 0
     let reason: string | undefined
     let needsAdmin = false
+    let needsSpooling: string | undefined
     for (const id of jobIds) {
       const res = await api.moveJob(id, printerId, Number.MAX_SAFE_INTEGER)
       if (res?.ok) moved += 1
       else {
         reason = res?.reason
         needsAdmin = needsAdmin || !!res?.needsAdmin
+        needsSpooling = needsSpooling ?? res?.needsSpooling
       }
     }
     if (moved) pushToast('info', `${moved} задание(й) → ${target?.name ?? ''}`)
     if (moved < jobIds.length) {
-      pushToast('warn', 'Часть заданий осталась', reason, needsAdmin ? 'elevate' : undefined)
+      pushToast(
+        'warn',
+        'Часть заданий осталась',
+        reason,
+        needsAdmin ? 'elevate' : needsSpooling ? 'spool' : undefined,
+        needsSpooling,
+      )
     }
     setSelection(new Set())
   }
@@ -599,6 +630,7 @@ export default function App() {
                   onMenuJob={openMenu}
                   onPreview={setPreview}
                   onDropFiles={addFiles}
+                  onAdd={() => pickFiles(col.printer.id)}
                 />
               ))}
               {columns.length === 0 && (

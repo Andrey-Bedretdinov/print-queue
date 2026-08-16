@@ -35,6 +35,18 @@ export function Toasts({ items, onClose }: Props) {
                   Перезапустить от администратора
                 </button>
               )}
+              {t.action === 'spool' && t.actionArg && (
+                <button
+                  className="btn btn-soft"
+                  style={{ height: 20, marginTop: 4, fontSize: 11 }}
+                  onClick={() => {
+                    api.enableSpooling(t.actionArg!)
+                    onClose(t.id)
+                  }}
+                >
+                  Включить очередь печати
+                </button>
+              )}
             </span>
             <button className="icon-btn" style={{ width: 18, height: 18 }} onClick={() => onClose(t.id)}>
               <IcoX size={10} />

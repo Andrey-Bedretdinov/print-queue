@@ -15,6 +15,7 @@ import {
   IcoNet,
   IcoPause,
   IcoPlay,
+  IcoPlus,
   IcoPower,
   IcoTrash,
   IcoUsb,
@@ -35,6 +36,7 @@ interface Props {
   onMenuJob: (job: Job, e: React.MouseEvent) => void
   onPreview: (job: Job) => void
   onDropFiles: (paths: string[], printerId: string) => void
+  onAdd: () => void
 }
 
 /** Высота строки очереди + зазор — по ней считаем, сколько заданий не влезло. */
@@ -54,6 +56,7 @@ export function Column({
   onMenuJob,
   onPreview,
   onDropFiles,
+  onAdd,
 }: Props) {
   const { printer, jobs } = column
   const { setNodeRef, isOver } = useDroppable({ id: `col:${printer.id}` })
@@ -133,9 +136,25 @@ export function Column({
             <span>{printer.address}</span>
             <span style={{ color: 'var(--line-strong)' }}>·</span>
             <span>{printer.detail ?? PRINTER_STATE_LABEL[printer.state]}</span>
+            {printer.direct && (
+              <span style={{ color: 'var(--warn)' }} title="Печать идёт мимо очереди — задания нельзя перенести">
+                · без очереди
+              </span>
+            )}
           </i>
         </span>
         <span className="col-actions">
+          <button
+            className="icon-btn tip"
+            data-tip="Добавить файлы"
+            {...stopDrag}
+            onClick={(e) => {
+              e.stopPropagation()
+              onAdd()
+            }}
+          >
+            <IcoPlus size={13} />
+          </button>
           <button
             className="icon-btn tip"
             data-tip={printer.paused ? 'Продолжить' : 'Пауза'}
@@ -205,7 +224,11 @@ export function Column({
             />
           ))}
         </SortableContext>
-        {jobs.length === 0 && <div className="empty">Перетащите файлы</div>}
+        {jobs.length === 0 && (
+          <button className="empty" onClick={onAdd}>
+            Пусто · добавить файлы
+          </button>
+        )}
       </div>
 
       {grid && (overflow > 0 || expanded) && (

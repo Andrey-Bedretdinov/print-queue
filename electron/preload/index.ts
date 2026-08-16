@@ -31,11 +31,14 @@ const api = {
   renamePrinter: (printerId: string, name: string): Promise<{ ok: boolean; reason?: string }> =>
     ipcRenderer.invoke(IPC.invoke.rename, printerId, name),
   elevate: (): Promise<boolean> => ipcRenderer.invoke(IPC.invoke.elevate),
+  pickFiles: (): Promise<string[]> => ipcRenderer.invoke(IPC.invoke.pickFiles),
+  enableSpooling: (printerId: string): Promise<{ ok: boolean; reason?: string }> =>
+    ipcRenderer.invoke(IPC.invoke.enableSpooling, printerId),
   moveJob: (
     jobId: string,
     printerId: string,
     position: number,
-  ): Promise<{ ok: boolean; reason?: string; needsAdmin?: boolean }> =>
+  ): Promise<{ ok: boolean; reason?: string; needsAdmin?: boolean; needsSpooling?: string }> =>
     ipcRenderer.invoke(IPC.invoke.moveJob, jobId, printerId, position),
   printerAction: (printerId: string, kind: PrinterActionKind): Promise<boolean> =>
     ipcRenderer.invoke(IPC.invoke.printerAction, printerId, kind),
