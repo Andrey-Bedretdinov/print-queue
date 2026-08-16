@@ -75,7 +75,7 @@ public static class PQSpool
                 int n = 0;
                 foreach (string f in all)
                 {
-                    if (n++ >= 8) { sb.Append(" ..."); break; }
+                    if (n++ >= 20) { sb.Append(" ..."); break; }
                     sb.Append(" ").Append(Path.GetFileName(f));
                 }
             }
@@ -84,7 +84,21 @@ public static class PQSpool
         return sb.ToString();
     }
 
-    /** Спул-файл может лежать в общем каталоге или в каталоге принтера. */
+    /** Номер задания в конце имени: «00162.SPL» и «FP00162.SPL» одинаково валидны. */
+    static bool Matches(string file, uint jobId)
+    {
+        string name = Path.GetFileNameWithoutExtension(file);
+        int end = name.Length;
+        while (end > 0 && char.IsDigit(name[end - 1])) end--;
+        if (end == name.Length) return false;
+        uint n;
+        return uint.TryParse(name.Substring(end), out n) && n == jobId;
+    }
+
+    /**
+     * Спул-файл может лежать в общем каталоге или в каталоге принтера, а имя —
+     * с префиксом: на разных системах спулер пишет и «00162.SPL», и «FP00162.SPL».
+     */
     static string FindSpool(string dirs, uint jobId)
     {
         foreach (string dir in dirs.Split(';'))
@@ -92,13 +106,14 @@ public static class PQSpool
             if (dir.Length == 0) continue;
             string exact = Path.Combine(dir, jobId.ToString("00000") + ".SPL");
             if (File.Exists(exact)) return exact;
+            string prefixed = Path.Combine(dir, "FP" + jobId.ToString("00000") + ".SPL");
+            if (File.Exists(prefixed)) return prefixed;
             if (!Directory.Exists(dir)) continue;
             try
             {
                 foreach (string f in Directory.GetFiles(dir, "*.SPL"))
                 {
-                    uint n;
-                    if (uint.TryParse(Path.GetFileNameWithoutExtension(f), out n) && n == jobId) return f;
+                    if (Matches(f, jobId)) return f;
                 }
             }
             catch (UnauthorizedAccessException) { /* причина уйдёт в диагностику */ }
