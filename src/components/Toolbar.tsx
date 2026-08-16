@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Settings } from '../../shared/types'
+import { api } from '../lib/api'
 import { IcoBoard, IcoGrid, IcoList, IcoMinus, IcoPlus, IcoRail, IcoShield } from './icons'
 
 export type Filter = 'all' | 'active' | 'error'
@@ -156,9 +157,13 @@ export function Toolbar({
           <span className={`switch${settings.simulation ? ' on' : ''}`} />
           Эмуляция
         </button>
-        <span className="version" title="Версия приложения">
+        <button
+          className="version"
+          title="Версия приложения. Нажмите, чтобы открыть журнал переносов"
+          onClick={() => api.openLog()}
+        >
           {version}
-        </span>
+        </button>
       </div>
     </div>
   )

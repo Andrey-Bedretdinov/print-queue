@@ -18,6 +18,7 @@ export const IPC = {
     rename: 'pq:rename-printer',
     elevate: 'pq:elevate',
     enableSpooling: 'pq:enable-spooling',
+    openLog: 'pq:open-log',
   },
 } as const
 

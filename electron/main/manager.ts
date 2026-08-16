@@ -17,7 +17,7 @@ import {
   systemPrintFile,
   systemPrinterAction,
 } from './windows-source'
-import { canMoveSystemJobs, explain, moveSpoolJob } from './spool'
+import { canMoveSystemJobs, explain, log, moveSpoolJob } from './spool'
 import { SpoolWatcher } from './watcher'
 
 type Emit = (state: AppState) => void
@@ -121,6 +121,7 @@ export class PrintManager {
   /** Проверяем доступ к спул-каталогу — от него зависит перенос чужих заданий. */
   private async checkSpoolAccess() {
     const next = await canMoveSystemJobs()
+    log(`запуск ${this.version}, спул-каталог ${next ? 'читается' : 'недоступен'}`)
     if (next === this.canMoveSystem) return
     this.canMoveSystem = next
     this.markDirty()

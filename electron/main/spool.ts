@@ -229,7 +229,7 @@ export async function moveSpoolJob(
 }
 
 /** Короткий журнал переносов рядом с настройками — для разбора на месте. */
-function log(line: string) {
+export function log(line: string) {
   try {
     appendFileSync(
       join(app.getPath('userData'), 'move.log'),

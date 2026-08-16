@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, nativeTheme } from 'electron'
 import { join } from 'node:path'
+import { existsSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { IPC } from '../../shared/ipc'
 import type { JobActionKind, PrinterActionKind, ToastMessage } from '../../shared/ipc'
@@ -164,6 +165,14 @@ ipcMain.handle(IPC.invoke.rename, (_e, printerId: string, name: string) =>
 ipcMain.handle(IPC.invoke.enableSpooling, (_e, printerId: string) =>
   manager?.enableSpooling(printerId),
 )
+
+/** Показывает журнал переносов в проводнике — путь искать вручную не нужно. */
+ipcMain.handle(IPC.invoke.openLog, () => {
+  const file = join(app.getPath('userData'), 'move.log')
+  if (!existsSync(file)) writeFileSync(file, '', 'utf8')
+  shell.showItemInFolder(file)
+  return file
+})
 
 /** Перезапуск с правами администратора — нужен для переноса чужих заданий. */
 ipcMain.handle(IPC.invoke.elevate, async () => {

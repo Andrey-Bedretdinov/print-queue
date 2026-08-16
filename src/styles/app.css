@@ -314,7 +314,14 @@ input {
   font-size: 10px;
   color: var(--text-4);
   font-variant-numeric: tabular-nums;
-  padding-left: 2px;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.version:hover {
+  background: var(--hover);
+  color: var(--primary);
 }
 
 .chip .num {

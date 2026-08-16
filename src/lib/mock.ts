@@ -248,6 +248,7 @@ export const mockApi: PqApi = {
   elevate: async () => false,
   enableSpooling: async () => ({ ok: true }),
   pickFiles: async () => [],
+  openLog: async () => '',
   addFiles: async () => ({ ok: true, added: 1 }),
   preview: async (path) => ({
     kind: 'text',
