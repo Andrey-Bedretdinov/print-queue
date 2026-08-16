@@ -59,6 +59,31 @@ public static class PQSpool
     const uint JOB_CONTROL_RESUME = 2;
     const uint JOB_CONTROL_DELETE = 5;
 
+    /** Что реально лежит в каталогах — попадает в журнал, когда файл не найден. */
+    public static string Describe(string dirs)
+    {
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        foreach (string dir in dirs.Split(';'))
+        {
+            if (dir.Length == 0) continue;
+            sb.Append("|").Append(dir).Append(" ");
+            if (!Directory.Exists(dir)) { sb.Append("нет каталога"); continue; }
+            try
+            {
+                string[] all = Directory.GetFiles(dir);
+                sb.Append(all.Length).Append(" файлов");
+                int n = 0;
+                foreach (string f in all)
+                {
+                    if (n++ >= 8) { sb.Append(" ..."); break; }
+                    sb.Append(" ").Append(Path.GetFileName(f));
+                }
+            }
+            catch (Exception e) { sb.Append("ошибка чтения: ").Append(e.GetType().Name); }
+        }
+        return sb.ToString();
+    }
+
     /** Спул-файл может лежать в общем каталоге или в каталоге принтера. */
     static string FindSpool(string dirs, uint jobId)
     {
@@ -68,11 +93,15 @@ public static class PQSpool
             string exact = Path.Combine(dir, jobId.ToString("00000") + ".SPL");
             if (File.Exists(exact)) return exact;
             if (!Directory.Exists(dir)) continue;
-            foreach (string f in Directory.GetFiles(dir, "*.SPL"))
+            try
             {
-                uint n;
-                if (uint.TryParse(Path.GetFileNameWithoutExtension(f), out n) && n == jobId) return f;
+                foreach (string f in Directory.GetFiles(dir, "*.SPL"))
+                {
+                    uint n;
+                    if (uint.TryParse(Path.GetFileNameWithoutExtension(f), out n) && n == jobId) return f;
+                }
             }
+            catch (UnauthorizedAccessException) { /* причина уйдёт в диагностику */ }
         }
         return null;
     }
@@ -114,7 +143,10 @@ public static class PQSpool
             paused = SetJob(src, jobId, 0, IntPtr.Zero, JOB_CONTROL_PAUSE);
 
             string spl = FindSpool(spoolDirs, jobId);
-            if (spl == null) throw new Exception("no-spool-file");
+            if (spl == null)
+                throw new Exception(
+                    "no-spool-file|задание " + jobId + " статус 0x" + info.Status.ToString("X") +
+                    " тип " + datatype + Describe(spoolDirs));
             byte[] data = File.ReadAllBytes(spl);
             if (data.Length == 0) throw new Exception("empty-spool-file");
 
@@ -187,7 +219,9 @@ const REASON: Record<string, string> = {
   'job-gone:0': 'Задание уже ушло из очереди',
 }
 
-export function explain(error?: string) {
+export function explain(full?: string) {
+  // После «|» идёт диагностика для журнала, пользователю она не нужна.
+  const error = full?.split('|')[0]
   if (!error) return 'Не удалось перенести задание'
   if (REASON[error]) return REASON[error]
   if (error.startsWith('job-gone')) return 'Задание уже ушло из очереди'
@@ -201,12 +235,14 @@ export function explain(error?: string) {
 
 /** true, если спул-каталог читается — то есть перенос чужих заданий доступен. */
 export async function canMoveSystemJobs() {
-  const res = await psJson<{ ok: boolean }>(
-    `try { $null = Get-ChildItem -Force -ErrorAction Stop (Join-Path $env:SystemRoot 'System32\\spool\\PRINTERS'); ` +
-      `ConvertTo-Json -Compress ([pscustomobject]@{ ok = $true }) } ` +
-      `catch { ConvertTo-Json -Compress ([pscustomobject]@{ ok = $false }) }`,
-    8000,
+  const res = await psJson<{ ok: boolean; dir: string; x64: boolean; files: number }>(
+    `$d = (Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers' -Name DefaultSpoolDirectory -ErrorAction SilentlyContinue).DefaultSpoolDirectory; ` +
+      `if (-not $d) { $d = Join-Path $env:SystemRoot 'System32\\spool\\PRINTERS' }; ` +
+      `try { $f = @(Get-ChildItem -Force -ErrorAction Stop $d); $ok = $true } catch { $f = @(); $ok = $false }; ` +
+      `ConvertTo-Json -Compress ([pscustomobject]@{ ok = $ok; dir = $d; x64 = [Environment]::Is64BitProcess; files = $f.Count })`,
+    10000,
   )
+  if (res) log(`спул: ${res.dir}, доступ ${res.ok ? 'есть' : 'нет'}, файлов ${res.files}, x64=${res.x64}`)
   return !!res?.ok
 }
 

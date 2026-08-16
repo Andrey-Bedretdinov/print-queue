@@ -333,9 +333,11 @@ export class PrintManager {
       void this.pollSystem()
       if (res.ok) return { ok: true }
 
+      const code = res.error?.split('|')[0]
+
       // Данные печатающегося задания спулер уже отдал принтеру и стёр с диска,
       // поэтому переносить можно только то, что ещё ждёт очереди.
-      if (res.error === 'no-spool-file' && job.state === 'printing') {
+      if (code === 'no-spool-file' && job.state === 'printing') {
         return {
           ok: false,
           reason: 'Задание уже печатается — перенести можно только ожидающие в очереди',
@@ -344,10 +346,10 @@ export class PrintManager {
       const reason = explain(res.error)
       return {
         ok: false,
-        reason: res.error && res.error !== reason ? `${reason} · ${res.error}` : reason,
+        reason: code && code !== reason ? `${reason} · ${code}` : reason,
         needsAdmin: reason === 'Нужны права администратора',
         // Очередь у принтера выключена — предложим включить её одной кнопкой.
-        needsSpooling: res.error === 'no-spool-file' ? job.printerId : undefined,
+        needsSpooling: code === 'no-spool-file' ? job.printerId : undefined,
       }
     }
 
