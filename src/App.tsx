@@ -525,7 +525,15 @@ export default function App() {
           totals={totals}
           settings={settings}
           systemAvailable={state.systemAvailable}
+          version={state.version}
+          needsAdmin={!state.canMoveSystem && visiblePrinters.some((p) => p.source === 'system')}
           pickerOpen={picker}
+          onElevate={async () => {
+            const ok = await api.elevate()
+            if (!ok) {
+              pushToast('warn', 'Не удалось перезапустить', 'Запустите приложение от администратора вручную')
+            }
+          }}
           onPicker={() => setPicker((v) => !v)}
           onToggleSim={() => api.settings({ simulation: !settings.simulation })}
           onToggleRail={() => api.settings({ railCollapsed: !settings.railCollapsed })}

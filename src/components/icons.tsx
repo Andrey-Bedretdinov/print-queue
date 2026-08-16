@@ -170,6 +170,13 @@ export const IcoGrip = ({ size = 14 }: Props) => (
   </svg>
 )
 
+export const IcoShield = ({ size = 14 }: Props) => (
+  <svg {...base(size)}>
+    <path d="M8 2 3 4v4c0 3 2.2 5.2 5 6 2.8-.8 5-3 5-6V4z" />
+    <path d="M6 8.2 7.4 9.6 10 6.8" />
+  </svg>
+)
+
 export const IcoBoard = ({ size = 14 }: Props) => (
   <svg {...base(size)}>
     <rect x="2" y="3" width="3.6" height="10" rx="1" />

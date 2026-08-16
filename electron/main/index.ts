@@ -89,6 +89,7 @@ app.whenReady().then(() => {
     (state: AppState) => send(IPC.state, state),
     (toast: ToastMessage) => send(IPC.toast, toast),
   )
+  manager.version = app.getVersion()
   manager.start()
 
   app.on('activate', () => {

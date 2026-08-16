@@ -116,6 +116,10 @@ export interface AppState {
   incidents: Incident[]
   settings: Settings
   systemAvailable: boolean
+  /** Версия приложения — чтобы было видно, какая сборка запущена. */
+  version: string
+  /** Читается ли спул-каталог: без этого чужие задания не перенести. */
+  canMoveSystem: boolean
 }
 
 export type PreviewKind = 'image' | 'pdf' | 'text' | 'none'

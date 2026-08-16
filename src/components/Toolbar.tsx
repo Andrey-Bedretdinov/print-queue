@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Settings } from '../../shared/types'
-import { IcoBoard, IcoGrid, IcoList, IcoMinus, IcoPlus, IcoRail } from './icons'
-// IcoPlus остаётся для шага размера блока в режиме сетки.
+import { IcoBoard, IcoGrid, IcoList, IcoMinus, IcoPlus, IcoRail, IcoShield } from './icons'
 
 export type Filter = 'all' | 'active' | 'error'
 
@@ -11,7 +10,10 @@ interface Props {
   totals: { printers: number; queued: number; errors: number; hidden: number }
   settings: Settings
   systemAvailable: boolean
+  version: string
+  needsAdmin: boolean
   pickerOpen: boolean
+  onElevate: () => void
   onPicker: () => void
   onToggleSim: () => void
   onToggleRail: () => void
@@ -38,7 +40,10 @@ export function Toolbar({
   totals,
   settings,
   systemAvailable,
+  version,
+  needsAdmin,
   pickerOpen,
+  onElevate,
   onPicker,
   onToggleSim,
   onToggleRail,
@@ -122,6 +127,12 @@ export function Toolbar({
       ))}
 
       <div className="toolbar-right">
+        {needsAdmin && (
+          <button className="chip warn tip" data-tip="Перезапустить с правами" onClick={onElevate}>
+            <IcoShield size={12} />
+            Перенос без прав администратора
+          </button>
+        )}
         <div className="counters">
           <span>
             <b>{totals.printers}</b> принтеров
@@ -145,6 +156,9 @@ export function Toolbar({
           <span className={`switch${settings.simulation ? ' on' : ''}`} />
           Эмуляция
         </button>
+        <span className="version" title="Версия приложения">
+          {version}
+        </span>
       </div>
     </div>
   )

@@ -150,7 +150,15 @@ const settings: Settings = {
   cardAuto: true,
 }
 
-const state: AppState = { printers, jobs, incidents, settings, systemAvailable: true }
+const state: AppState = {
+  printers,
+  jobs,
+  incidents,
+  settings,
+  systemAvailable: true,
+  version: 'dev',
+  canMoveSystem: false,
+}
 const listeners: Array<(s: AppState) => void> = []
 const toasters: Array<(t: ToastMessage) => void> = []
 

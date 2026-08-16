@@ -300,6 +300,23 @@ input {
   color: var(--primary);
 }
 
+.chip.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border: 1px solid var(--warn-line);
+}
+
+.chip.warn:hover {
+  background: var(--warn-line);
+}
+
+.version {
+  font-size: 10px;
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+  padding-left: 2px;
+}
+
 .chip .num {
   font-variant-numeric: tabular-nums;
   opacity: 0.7;
