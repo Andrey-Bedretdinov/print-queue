@@ -101,15 +101,34 @@ public static class PQSpool
         }
     }
 
+    static int IndexOfBytes(byte[] hay, byte[] needle, int limit)
+    {
+        if (needle.Length == 0) return -1;
+        int last = Math.Min(hay.Length, limit) - needle.Length;
+        for (int i = 0; i <= last; i++)
+        {
+            bool same = true;
+            for (int j = 0; j < needle.Length; j++)
+            {
+                if (hay[i + j] != needle[j]) { same = false; break; }
+            }
+            if (same) return i;
+        }
+        return -1;
+    }
+
+    /** Строки в .SHD лежат по произвольному смещению — ищем байтами, не текстом. */
+    static bool HasText(byte[] head, string value)
+    {
+        if (string.IsNullOrEmpty(value)) return false;
+        return IndexOfBytes(head, System.Text.Encoding.Unicode.GetBytes(value), head.Length) >= 0;
+    }
+
     /** Номер задания лежит в заголовке .SHD отдельным полем. */
     static bool HasJobId(byte[] head, uint jobId)
     {
-        for (int i = 0; i + 4 <= Math.Min(head.Length, 256); i += 4)
-        {
-            uint v = (uint)(head[i] | (head[i + 1] << 8) | (head[i + 2] << 16) | (head[i + 3] << 24));
-            if (v == jobId) return true;
-        }
-        return false;
+        byte[] needle = BitConverter.GetBytes(jobId);
+        return IndexOfBytes(head, needle, 512) >= 0;
     }
 
     /**
@@ -117,15 +136,19 @@ public static class PQSpool
      * может принадлежать заданию 166. Поэтому файл ищется по содержимому пары
      * .SHD — там лежат имя принтера и документа — и по совпадению размера.
      */
+    public static string Report = "";
+
     static string FindSpool(string dirs, uint jobId, string printer, string document, long size)
     {
         string best = null;
         int bestScore = 0;
+        System.Text.StringBuilder log = new System.Text.StringBuilder();
+
         foreach (string dir in dirs.Split(';'))
         {
             if (dir.Length == 0) continue;
             string exact = Path.Combine(dir, jobId.ToString("00000") + ".SPL");
-            if (File.Exists(exact)) return exact;
+            if (File.Exists(exact)) { Report = "точное имя"; return exact; }
             if (!Directory.Exists(dir)) continue;
             string[] files;
             try { files = Directory.GetFiles(dir, "*.SPL"); }
@@ -134,28 +157,30 @@ public static class PQSpool
             foreach (string f in files)
             {
                 int score = 0;
+                string marks = "";
                 try
                 {
                     string shd = Path.Combine(
                         Path.GetDirectoryName(f), Path.GetFileNameWithoutExtension(f) + ".SHD");
                     if (File.Exists(shd))
                     {
-                        byte[] head = Head(shd, 64 * 1024);
-                        if (HasJobId(head, jobId)) score += 4;
-                        string text = System.Text.Encoding.Unicode.GetString(head);
-                        if (!string.IsNullOrEmpty(document) &&
-                            text.IndexOf(document, StringComparison.OrdinalIgnoreCase) >= 0) score += 3;
-                        if (!string.IsNullOrEmpty(printer) &&
-                            text.IndexOf(printer, StringComparison.OrdinalIgnoreCase) >= 0) score += 2;
+                        byte[] head = Head(shd, 256 * 1024);
+                        if (HasJobId(head, jobId)) { score += 4; marks += "номер "; }
+                        if (HasText(head, document)) { score += 3; marks += "документ "; }
+                        if (HasText(head, printer)) { score += 2; marks += "принтер "; }
                     }
-                    if (size > 0 && new FileInfo(f).Length == size) score += 2;
+                    else marks += "без.SHD ";
+                    if (size > 0 && new FileInfo(f).Length == size) { score += 2; marks += "размер "; }
                 }
                 catch (IOException) { continue; }
                 catch (UnauthorizedAccessException) { continue; }
 
+                log.Append(" ").Append(Path.GetFileName(f)).Append("=").Append(score);
+                if (marks.Length > 0) log.Append("(").Append(marks.Trim()).Append(")");
                 if (score > bestScore) { bestScore = score; best = f; }
             }
         }
+        Report = "кандидаты:" + (log.Length == 0 ? " нет" : log.ToString());
         // Одного размера мало: нужен номер задания либо имя документа.
         return bestScore >= 3 ? best : null;
     }
@@ -201,7 +226,7 @@ public static class PQSpool
                 throw new Exception(
                     "no-spool-file|задание " + jobId + " статус 0x" + info.Status.ToString("X") +
                     " размер " + size + " документ " + document + " тип " + datatype +
-                    Describe(spoolDirs));
+                    "|" + Report + Describe(spoolDirs));
             byte[] data = File.ReadAllBytes(spl);
             if (data.Length == 0) throw new Exception("empty-spool-file");
 
