@@ -1,0 +1,96 @@
+/*
+ * Palette lifted from the Keenetic web configurator (ndw design system):
+ * primary #0086cb, 4px radii, Roboto 14/22, light + dark token sets.
+ */
+
+:root {
+  --font: Roboto, 'Segoe UI', system-ui, sans-serif;
+  --radius: 4px;
+  --radius-sm: 2px;
+  --radius-lg: 6px;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --fast: 110ms;
+  --med: 180ms;
+  --slow: 260ms;
+
+  --primary: #0086cb;
+  --primary-hover: #1c6c9a;
+  --primary-soft: #ecf5fa;
+  --primary-softer: #f5fafc;
+  --primary-line: #cce6f5;
+  --primary-mid: #77bce4;
+  --primary-disabled: #c1dded;
+
+  --ok: #03b25a;
+  --ok-line: #cbf2df;
+  --ok-soft: #e4faef;
+  --warn: #e8951a;
+  --warn-line: #f2e1b0;
+  --warn-soft: #fff7e1;
+  --err: #de3d3d;
+  --err-line: #ffd0c8;
+  --err-soft: #ffece9;
+}
+
+:root,
+:root[data-theme='light'] {
+  --bg: #edeef0;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --surface-2: #fafafa;
+  --surface-3: #f0f0f0;
+  --rail: #fafafa;
+  --chrome: #ffffff;
+  --line: #ebebeb;
+  --line-strong: #d6d8d9;
+  --stroke: #bdb7b7;
+  --text: #000000;
+  --text-2: #4b4b4b;
+  --text-3: #6e6e6e;
+  --text-4: #949b9f;
+  --hover: #f5fafc;
+  --active: #ecf5fa;
+  --scroll-thumb: #d6d8d9;
+  --scroll-track: #f0f0f0;
+  --shadow-1: 0 2px 2px 0 #949b9f40, 0 0 2px 0 #949b9f26;
+  --shadow-2: 0 10px 24px -6px #949b9f66, 0 0 2px 0 #949b9f33;
+  --shadow-drag: 0 12px 22px -6px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--primary-line);
+  --overlay: rgba(0, 0, 0, 0.25);
+  --led-off: #cacdcf;
+}
+
+:root[data-theme='dark'] {
+  --bg: #161c27;
+  --surface: #1b2434;
+  --card: #212c3e;
+  --surface-2: #243146;
+  --surface-3: #2e3d57;
+  --rail: #161c27;
+  --chrome: #1b2434;
+  --line: #2e3d57;
+  --line-strong: #3d5073;
+  --stroke: #4d545f;
+  --text: #c2c2c2;
+  --text-2: #b9bec1;
+  --text-3: #949b9f;
+  --text-4: #6f737b;
+  --hover: #243146;
+  --active: #2e3d57;
+  --scroll-thumb: #3d5073;
+  --scroll-track: #2e3d57;
+  --shadow-1: 0 2px 2px 0 rgb(61 80 115 / 40%), 0 0 2px 0 rgb(61 80 115 / 30%);
+  --shadow-2: 0 12px 26px -8px rgba(6, 8, 11, 0.7), 0 0 2px 0 rgba(6, 8, 11, 0.5);
+  --shadow-drag: 0 14px 26px -8px rgba(6, 8, 11, 0.8), 0 0 0 1px var(--primary);
+  --overlay: rgba(6, 8, 11, 0.55);
+  --led-off: #4d545f;
+
+  --primary-soft: #1c334a;
+  --primary-softer: #182839;
+  --primary-line: #2d5a7a;
+  --ok-soft: #14352a;
+  --ok-line: #1e5c43;
+  --warn-soft: #3a2f1a;
+  --warn-line: #6b5323;
+  --err-soft: #3a2020;
+  --err-line: #6d3030;
+}
