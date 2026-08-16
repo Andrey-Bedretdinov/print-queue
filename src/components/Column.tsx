@@ -217,6 +217,7 @@ export function Column({
             <JobRow
               key={job.id}
               job={job}
+              printerRunning={printer.state === 'printing' && !printer.paused}
               onPreview={onPreview}
               selected={selection.has(job.id)}
               onSelect={onSelectJob}

@@ -336,8 +336,10 @@ export class PrintManager {
       const code = res.error?.split('|')[0]
 
       // Данные печатающегося задания спулер уже отдал принтеру и стёр с диска,
-      // поэтому переносить можно только то, что ещё ждёт очереди.
-      if (code === 'no-spool-file' && job.state === 'printing') {
+      // поэтому переносить можно только то, что ещё ждёт очереди. К вставшему
+      // принтеру это не относится: там задание никуда не ушло.
+      const source = this.sysPrinters.find((p) => p.id === job.printerId)
+      if (code === 'no-spool-file' && job.state === 'printing' && source?.state === 'printing') {
         return {
           ok: false,
           reason: 'Задание уже печатается — перенести можно только ожидающие в очереди',

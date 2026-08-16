@@ -11,13 +11,25 @@ interface Props {
   onPreview?: (job: Job) => void
   overlay?: boolean
   selected?: boolean
+  /** Принтер действительно печатает — не стоит, не в ошибке и не на паузе. */
+  printerRunning?: boolean
   onSelect?: (job: Job, e: React.MouseEvent) => void
   onMenu?: (job: Job, e: React.MouseEvent) => void
 }
 
-export function JobRow({ job, onPreview, overlay, selected, onSelect, onMenu }: Props) {
-  // Печатающееся задание Windows уже отдала принтеру — тащить его некуда.
-  const locked = job.source === 'system' && job.state === 'printing'
+export function JobRow({
+  job,
+  onPreview,
+  overlay,
+  selected,
+  printerRunning,
+  onSelect,
+  onMenu,
+}: Props) {
+  // Данные печатающегося задания уже ушли на принтер — переносить нечего.
+  // Но если принтер встал (ошибка, нет бумаги, пауза), задание никуда не
+  // уходит и его надо уметь увести на живой принтер.
+  const locked = job.source === 'system' && job.state === 'printing' && printerRunning === true
   const sortable = useSortable({ id: job.id, disabled: overlay || locked })
   const total = job.pages * job.copies
   const percent = total > 0 ? Math.min(100, (job.printedPages / total) * 100) : 0

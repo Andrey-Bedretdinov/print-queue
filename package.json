@@ -1,6 +1,6 @@
 {
   "name": "print-queue",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "Compact print queue manager for Windows 10/11",
   "author": {
     "name": "Andrey Bedretdinov",
