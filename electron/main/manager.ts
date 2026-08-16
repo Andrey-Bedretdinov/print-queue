@@ -331,7 +331,11 @@ export class PrintManager {
       void this.pollSystem()
       if (res.ok) return { ok: true }
       const reason = explain(res.error)
-      return { ok: false, reason, needsAdmin: reason === 'Нужны права администратора' }
+      return {
+        ok: false,
+        reason: res.error && res.error !== reason ? `${reason} · ${res.error}` : reason,
+        needsAdmin: reason === 'Нужны права администратора',
+      }
     }
 
     if (target.source === 'system') {

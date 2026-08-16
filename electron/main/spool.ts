@@ -1,3 +1,6 @@
+import { app } from 'electron'
+import { appendFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { psJson, psq } from './powershell'
 
 /**
@@ -53,7 +56,26 @@ public static class PQSpool
     }
 
     const uint JOB_CONTROL_PAUSE = 1;
+    const uint JOB_CONTROL_RESUME = 2;
     const uint JOB_CONTROL_DELETE = 5;
+
+    /** Спул-файл может лежать в общем каталоге или в каталоге принтера. */
+    static string FindSpool(string dirs, uint jobId)
+    {
+        foreach (string dir in dirs.Split(';'))
+        {
+            if (dir.Length == 0) continue;
+            string exact = Path.Combine(dir, jobId.ToString("00000") + ".SPL");
+            if (File.Exists(exact)) return exact;
+            if (!Directory.Exists(dir)) continue;
+            foreach (string f in Directory.GetFiles(dir, "*.SPL"))
+            {
+                uint n;
+                if (uint.TryParse(Path.GetFileNameWithoutExtension(f), out n) && n == jobId) return f;
+            }
+        }
+        return null;
+    }
 
     static IntPtr Open(string printer)
     {
@@ -75,23 +97,24 @@ public static class PQSpool
         return buf;
     }
 
-    public static string Move(string source, uint jobId, string target, string spoolDir)
+    public static string Move(string source, uint jobId, string target, string spoolDirs)
     {
         IntPtr src = Open(source);
-        string datatype, document;
+        bool paused = false;
         try
         {
             uint size;
             IntPtr buf = JobBuffer(src, jobId, out size);
             JOB_INFO_1 info = (JOB_INFO_1)Marshal.PtrToStructure(buf, typeof(JOB_INFO_1));
-            datatype = Marshal.PtrToStringUni(info.pDatatype);
-            document = Marshal.PtrToStringUni(info.pDocument);
+            string datatype = Marshal.PtrToStringUni(info.pDatatype);
+            string document = Marshal.PtrToStringUni(info.pDocument);
             Marshal.FreeHGlobal(buf);
 
-            SetJob(src, jobId, 0, IntPtr.Zero, JOB_CONTROL_PAUSE);
+            // Пауза не даёт спулеру дочитать задание, пока мы его копируем.
+            paused = SetJob(src, jobId, 0, IntPtr.Zero, JOB_CONTROL_PAUSE);
 
-            string spl = Path.Combine(spoolDir, jobId.ToString("00000") + ".SPL");
-            if (!File.Exists(spl)) throw new Exception("no-spool-file");
+            string spl = FindSpool(spoolDirs, jobId);
+            if (spl == null) throw new Exception("no-spool-file");
             byte[] data = File.ReadAllBytes(spl);
             if (data.Length == 0) throw new Exception("empty-spool-file");
 
@@ -124,13 +147,19 @@ public static class PQSpool
                         throw new Exception("schedule:" + Marshal.GetLastWin32Error());
 
                     SetJob(src, jobId, 0, IntPtr.Zero, JOB_CONTROL_DELETE);
+                    paused = false;
                     return "{\\"ok\\":true,\\"jobId\\":" + newId + ",\\"datatype\\":\\"" + datatype + "\\"}";
                 }
                 finally { Marshal.FreeHGlobal(add); }
             }
             finally { ClosePrinter(dst); }
         }
-        finally { ClosePrinter(src); }
+        finally
+        {
+            // Не получилось — задание обязано вернуться в работу, а не зависнуть.
+            if (paused) SetJob(src, jobId, 0, IntPtr.Zero, JOB_CONTROL_RESUME);
+            ClosePrinter(src);
+        }
     }
 }
 "@
@@ -152,8 +181,9 @@ export interface SpoolMoveResult {
 }
 
 const REASON: Record<string, string> = {
-  'no-spool-file': 'Windows уже отдал задание на принтер — переносить нечего',
-  'empty-spool-file': 'Спул-файл задания пуст',
+  'no-spool-file':
+    'Нет файла задания: в свойствах принтера включите «Использовать очередь печати»',
+  'empty-spool-file': 'Файл задания ещё пуст — повторите через секунду',
   'job-gone:0': 'Задание уже ушло из очереди',
 }
 
@@ -185,24 +215,45 @@ export async function moveSpoolJob(
   jobId: number,
   target: string,
 ): Promise<SpoolMoveResult> {
-  const dir = await spoolDir()
+  const dirs = await spoolDirs(source)
   const script = HELPER.replace('__SRC__', psq(source))
     .replace('__JOB__', String(jobId))
     .replace('__DST__', psq(target))
-    .replace('__DIR__', psq(dir))
-  const res = await psJson<SpoolMoveResult>(script, 30000)
-  return res ?? { ok: false, error: 'helper-failed' }
+    .replace('__DIR__', psq(dirs.join(';')))
+  const res = (await psJson<SpoolMoveResult>(script, 30000)) ?? {
+    ok: false,
+    error: 'helper-failed',
+  }
+  log(`${source} #${jobId} -> ${target}: ${res.ok ? 'ok ' + res.jobId : res.error}`)
+  return res
 }
 
-let cachedDir = ''
+/** Короткий журнал переносов рядом с настройками — для разбора на месте. */
+function log(line: string) {
+  try {
+    appendFileSync(
+      join(app.getPath('userData'), 'move.log'),
+      `${new Date().toISOString()} ${line}\r\n`,
+      'utf8',
+    )
+  } catch {
+    /* журнал не должен мешать работе */
+  }
+}
 
-async function spoolDir() {
-  if (cachedDir) return cachedDir
-  const res = await psJson<{ dir: string }>(
-    `$d = (Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers' -Name DefaultSpoolDirectory -ErrorAction SilentlyContinue).DefaultSpoolDirectory; ` +
+let cachedDefault = ''
+
+/** Каталог принтера может быть переопределён — проверяем оба места. */
+async function spoolDirs(printer: string) {
+  const res = await psJson<{ common: string; own: string | null }>(
+    `$root = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers'; ` +
+      `$d = (Get-ItemProperty $root -Name DefaultSpoolDirectory -ErrorAction SilentlyContinue).DefaultSpoolDirectory; ` +
       `if (-not $d) { $d = Join-Path $env:SystemRoot 'System32\\spool\\PRINTERS' }; ` +
-      `ConvertTo-Json -Compress ([pscustomobject]@{ dir = $d })`,
+      `$own = (Get-ItemProperty (Join-Path $root '${psq(printer)}') -Name SpoolDirectory -ErrorAction SilentlyContinue).SpoolDirectory; ` +
+      `ConvertTo-Json -Compress ([pscustomobject]@{ common = $d; own = $own })`,
+    10000,
   )
-  cachedDir = res?.dir || 'C:\\Windows\\System32\\spool\\PRINTERS'
-  return cachedDir
+  const common = res?.common || cachedDefault || 'C:\\Windows\\System32\\spool\\PRINTERS'
+  cachedDefault = common
+  return [res?.own, common].filter((x): x is string => !!x)
 }
