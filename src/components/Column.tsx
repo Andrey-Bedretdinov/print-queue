@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { motion } from 'framer-motion'
@@ -11,6 +11,7 @@ import { eta } from '../lib/format'
 import { JobRow } from './JobRow'
 import {
   IcoAlert,
+  IcoChevronDown,
   IcoNet,
   IcoPause,
   IcoPlay,
@@ -27,11 +28,19 @@ interface Props {
   dragging: boolean
   dropTarget: boolean
   selected: boolean
+  grid: boolean
+  cardHeight: number
+  selection: Set<string>
   onSelect: (id: string) => void
+  onSelectJob: (job: Job, e: React.MouseEvent) => void
+  onMenuJob: (job: Job, e: React.MouseEvent) => void
   onPreview: (job: Job) => void
   onDropFiles: (paths: string[], printerId: string) => void
   onAdd: () => void
 }
+
+/** Высота строки очереди + зазор — по ней считаем, сколько заданий не влезло. */
+const ROW = 26
 
 export function Column({
   column,
@@ -39,7 +48,12 @@ export function Column({
   dragging,
   dropTarget,
   selected,
+  grid,
+  cardHeight,
+  selection,
   onSelect,
+  onSelectJob,
+  onMenuJob,
   onPreview,
   onDropFiles,
   onAdd,
@@ -48,6 +62,23 @@ export function Column({
   const { setNodeRef, isOver } = useDroppable({ id: `col:${printer.id}` })
   const handle = useDraggable({ id: `pcol:${printer.id}`, disabled: dragKind === 'job' })
   const [fileOver, setFileOver] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [overflow, setOverflow] = useState(0)
+  const bodyRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const el = bodyRef.current
+    if (!grid || !el) {
+      setOverflow(0)
+      return
+    }
+    const fits = Math.max(1, Math.floor((el.clientHeight - 4) / ROW))
+    setOverflow(Math.max(0, jobs.length - fits))
+  }, [grid, jobs.length, cardHeight, expanded])
+
+  useLayoutEffect(() => {
+    if (!grid) setExpanded(false)
+  }, [grid])
 
   const open = jobs.filter((j) => j.state !== 'completed' && j.state !== 'canceled')
   const errors = open.filter((j) => j.state === 'error')
@@ -67,7 +98,9 @@ export function Column({
         'col' +
         (isOver || fileOver || dropTarget ? ' over' : '') +
         (printer.state === 'offline' ? ' dim' : '') +
-        (dragging ? ' lifted' : '')
+        (dragging ? ' lifted' : '') +
+        (expanded ? ' expanded' : '') +
+        (grid && overflow > 0 && !expanded ? ' clipped' : '')
       }
       onClick={() => onSelect(printer.id)}
       onDragOver={(e) => {
@@ -173,14 +206,34 @@ export function Column({
         </div>
       )}
 
-      <div className="col-body">
+      <div className="col-body" ref={bodyRef}>
         <SortableContext items={jobs.map((j) => j.id)} strategy={verticalListSortingStrategy}>
           {jobs.map((job) => (
-            <JobRow key={job.id} job={job} onPreview={onPreview} />
+            <JobRow
+              key={job.id}
+              job={job}
+              onPreview={onPreview}
+              selected={selection.has(job.id)}
+              onSelect={onSelectJob}
+              onMenu={onMenuJob}
+            />
           ))}
         </SortableContext>
         {jobs.length === 0 && <div className="empty">Пусто</div>}
       </div>
+
+      {grid && (overflow > 0 || expanded) && (
+        <button
+          className={`col-more${expanded ? ' up' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            setExpanded((v) => !v)
+          }}
+        >
+          <IcoChevronDown size={12} />
+          {expanded ? 'Свернуть' : `Ещё ${overflow}`}
+        </button>
+      )}
 
       <div className="col-foot">
         <span>

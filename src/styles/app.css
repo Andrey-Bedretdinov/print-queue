@@ -337,6 +337,49 @@ input {
   background: #0097dc;
 }
 
+.seg {
+  display: inline-flex;
+  gap: 1px;
+  padding: 1px;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+}
+
+.seg .icon-btn.on {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: var(--shadow-1);
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 3px;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.stepper b {
+  min-width: 26px;
+  text-align: center;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepper .icon-btn {
+  width: 18px;
+  height: 18px;
+}
+
+.stepper .icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .badge {
   min-width: 16px;
   height: 16px;
@@ -583,6 +626,62 @@ input {
   overscroll-behavior-x: contain;
 }
 
+/* Сетка: колонки раскладываются по ширине окна, высота блока настраивается. */
+.board.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(244px, 1fr));
+  grid-auto-rows: min-content;
+  align-content: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.board.grid .col {
+  width: auto;
+  height: var(--card-h, 240px);
+  transition: height var(--med) var(--ease), border-color var(--med) var(--ease),
+    box-shadow var(--med) var(--ease);
+}
+
+.board.grid .col.expanded {
+  height: calc(var(--card-h, 240px) * 2);
+  z-index: 2;
+}
+
+.board.grid .col-body {
+  overflow-y: hidden;
+}
+
+.board.grid .col.expanded .col-body {
+  overflow-y: auto;
+}
+
+/* Обрезанную последнюю строку гасим градиентом, чтобы не было «половинок». */
+.board.grid .col.clipped .col-body {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+}
+
+.col-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 20px;
+  font-size: 10px;
+  color: var(--primary);
+  background: var(--primary-softer);
+  border-top: 1px solid var(--line);
+  transition: background var(--fast) var(--ease);
+}
+
+.col-more:hover {
+  background: var(--primary-soft);
+}
+
+.col-more.up svg {
+  transform: rotate(180deg);
+}
+
 .col {
   width: 268px;
   flex: none;
@@ -803,6 +902,18 @@ input {
   opacity: 0.35;
 }
 
+.job.sel {
+  background: var(--active);
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary-line);
+}
+
+.job.sel.error {
+  background: var(--err-soft);
+  border-color: var(--err);
+  box-shadow: inset 0 0 0 1px var(--err-line);
+}
+
 .job.drag {
   cursor: grabbing;
   box-shadow: var(--shadow-drag);
@@ -1018,6 +1129,78 @@ input {
   text-transform: uppercase;
   color: var(--text-4);
   padding: 8px 4px 2px;
+}
+
+/* ------------------------------------------------------------ контекстное */
+
+.menu {
+  position: fixed;
+  z-index: 70;
+  min-width: 208px;
+  max-width: 280px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+  transform-origin: top left;
+}
+
+.menu-label {
+  padding: 5px 8px 4px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  text-align: left;
+  color: var(--text-2);
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.menu-item:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--primary);
+}
+
+.menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.menu-item.danger:hover {
+  background: var(--err-soft);
+  color: var(--err);
+}
+
+.menu-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-hint {
+  font-size: 9px;
+  color: var(--text-4);
+}
+
+.menu-sep {
+  height: 1px;
+  background: var(--line);
+  margin: 3px 0;
 }
 
 /* --------------------------------------------------------------- popover */

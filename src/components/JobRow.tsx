@@ -10,9 +10,12 @@ interface Props {
   job: Job
   onPreview?: (job: Job) => void
   overlay?: boolean
+  selected?: boolean
+  onSelect?: (job: Job, e: React.MouseEvent) => void
+  onMenu?: (job: Job, e: React.MouseEvent) => void
 }
 
-export function JobRow({ job, onPreview, overlay }: Props) {
+export function JobRow({ job, onPreview, overlay, selected, onSelect, onMenu }: Props) {
   const sortable = useSortable({ id: job.id, disabled: overlay })
   const total = job.pages * job.copies
   const percent = total > 0 ? Math.min(100, (job.printedPages / total) * 100) : 0
@@ -34,9 +37,15 @@ export function JobRow({ job, onPreview, overlay }: Props) {
     <div
       ref={overlay ? undefined : sortable.setNodeRef}
       style={style}
-      className={`job ${job.state}${sortable.isDragging && !overlay ? ' ghost' : ''}${overlay ? ' drag' : ''}`}
+      className={`job ${job.state}${sortable.isDragging && !overlay ? ' ghost' : ''}${overlay ? ' drag' : ''}${selected ? ' sel' : ''}`}
       {...(overlay ? {} : sortable.attributes)}
       {...(overlay ? {} : sortable.listeners)}
+      onClick={(e) => onSelect?.(job, e)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onMenu?.(job, e)
+      }}
       onDoubleClick={() => job.path && onPreview?.(job)}
       title={`${job.name} · ${pages(total)} · ${bytes(job.bytes)}`}
     >

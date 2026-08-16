@@ -102,6 +102,10 @@ export interface Settings {
   hidden: string[]
   /** Printer ids in display order; anything unknown is appended. */
   order: string[]
+  /** `board` — колонки с горизонтальной прокруткой, `grid` — сетка по окну. */
+  layout: 'board' | 'grid'
+  /** Высота блока очереди в режиме сетки, px. */
+  cardHeight: number
 }
 
 export interface AppState {

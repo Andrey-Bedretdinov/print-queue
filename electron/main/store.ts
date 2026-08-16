@@ -27,6 +27,8 @@ const DEFAULTS: Persisted = {
     compact: false,
     hidden: [],
     order: [],
+    layout: 'board',
+    cardHeight: 240,
   },
   incidents: [],
   order: {},

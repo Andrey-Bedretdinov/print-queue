@@ -25,6 +25,7 @@ import { Incidents } from './components/Incidents'
 import { AlertBar } from './components/AlertBar'
 import { Toasts } from './components/Toasts'
 import { PrinterPicker } from './components/PrinterPicker'
+import { ContextMenu, type MenuTarget } from './components/ContextMenu'
 
 export interface ColumnView {
   printer: Printer
@@ -49,6 +50,9 @@ export default function App() {
   const [override, setOverride] = useState<Record<string, string[]> | null>(null)
   const [overCol, setOverCol] = useState<string | null>(null)
   const [fileOver, setFileOver] = useState(false)
+  const [selection, setSelection] = useState<Set<string>>(new Set())
+  const [menu, setMenu] = useState<MenuTarget | null>(null)
+  const anchorRef = useRef<string | null>(null)
 
   const dragRef = useRef(false)
   const pendingRef = useRef<AppState | null>(null)
@@ -88,7 +92,13 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (preview) setPreview(null)
+        else if (menu) setMenu(null)
         else if (drawer) setDrawer(false)
+        else setSelection(new Set())
+      }
+      if (e.key === 'a' && e.ctrlKey) {
+        e.preventDefault()
+        setSelection(new Set((state?.jobs ?? []).map((j) => j.id)))
       }
       if (e.key === 'f' && e.ctrlKey) {
         e.preventDefault()
@@ -97,7 +107,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [preview, drawer])
+  }, [preview, drawer, menu, state?.jobs])
 
   /** Vertical wheel scrolls the board sideways unless a queue can still scroll. */
   useEffect(() => {
@@ -105,6 +115,7 @@ export default function App() {
     if (!board) return
     const onWheel = (e: WheelEvent) => {
       if (e.deltaX !== 0 || e.ctrlKey) return
+      if (board.classList.contains('grid')) return
       const body = (e.target as HTMLElement)?.closest?.('.col-body') as HTMLElement | null
       if (body && body.scrollHeight > body.clientHeight + 1) {
         const up = e.deltaY < 0
@@ -231,6 +242,9 @@ export default function App() {
     }
     const job = jobMap.get(id)
     if (!job) return
+    // Тянем всё выделение, только если тянут за выделенную строку.
+    if (!selection.has(id)) setSelection(new Set())
+    setMenu(null)
     dragRef.current = true
     setDrag(job)
     setOverride(snapshot())
@@ -312,11 +326,17 @@ export default function App() {
     setOverride({ ...map, [to]: ids })
 
     const res = await api.moveJob(jobId, to, position)
+    const others = selection.has(jobId) ? [...selection].filter((id) => id !== jobId) : []
+    for (const id of others) await api.moveJob(id, to, Number.MAX_SAFE_INTEGER)
+    if (others.length) setSelection(new Set())
     if (!res?.ok) {
       pushToast('warn', 'Перенос не выполнен', res?.reason)
     } else if (from !== to) {
       const target = state?.printers.find((p) => p.id === to)
-      pushToast('info', jobMap.get(jobId)?.name ?? 'Задание', `→ ${target?.name ?? ''}`)
+      const label = others.length
+        ? `${others.length + 1} задания`
+        : (jobMap.get(jobId)?.name ?? 'Задание')
+      pushToast('info', label, `→ ${target?.name ?? ''}`)
     }
     setOverride(null)
     if (pendingRef.current) {
@@ -360,6 +380,58 @@ export default function App() {
       ?.querySelector<HTMLElement>(`[data-col="${CSS.escape(id)}"]`)
       ?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
   }
+
+  /** Клик — выделить, Ctrl — добавить, Shift — диапазон внутри очереди. */
+  const selectJob = (job: Job, e: React.MouseEvent) => {
+    const column = columns.find((c) => c.printer.id === job.printerId)
+    const ids = column?.jobs.map((j) => j.id) ?? []
+    setSelection((prev) => {
+      if (e.shiftKey && anchorRef.current && ids.includes(anchorRef.current)) {
+        const a = ids.indexOf(anchorRef.current)
+        const b = ids.indexOf(job.id)
+        const range = ids.slice(Math.min(a, b), Math.max(a, b) + 1)
+        return new Set(e.ctrlKey ? [...prev, ...range] : range)
+      }
+      anchorRef.current = job.id
+      if (e.ctrlKey || e.metaKey) {
+        const next = new Set(prev)
+        next.has(job.id) ? next.delete(job.id) : next.add(job.id)
+        return next
+      }
+      return prev.size === 1 && prev.has(job.id) ? new Set() : new Set([job.id])
+    })
+  }
+
+  const openMenu = (job: Job, e: React.MouseEvent) => {
+    const ids = selection.has(job.id) ? [...selection] : [job.id]
+    if (!selection.has(job.id)) setSelection(new Set([job.id]))
+    const jobs = ids.map((id) => jobMap.get(id)).filter((j): j is Job => !!j)
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      jobIds: ids,
+      printerId: job.printerId,
+      canPreview: ids.length === 1 && !!job.path,
+      canPause: jobs.some((j) => j.state === 'queued' || j.state === 'printing'),
+      canRetry: jobs.some((j) => j.state === 'error' && j.source === 'sim'),
+    })
+  }
+
+  const moveMany = async (jobIds: string[], printerId: string) => {
+    const target = state?.printers.find((p) => p.id === printerId)
+    let moved = 0
+    let reason: string | undefined
+    for (const id of jobIds) {
+      const res = await api.moveJob(id, printerId, Number.MAX_SAFE_INTEGER)
+      if (res?.ok) moved += 1
+      else reason = res?.reason
+    }
+    if (moved) pushToast('info', `${moved} задание(й) → ${target?.name ?? ''}`)
+    if (moved < jobIds.length) pushToast('warn', 'Часть заданий осталась', reason)
+    setSelection(new Set())
+  }
+
+  const menuJobs = () => (menu?.jobIds ?? []).map((id) => jobMap.get(id)).filter((j): j is Job => !!j)
 
   const toggleHidden = (id: string) => {
     const next = hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id]
@@ -420,6 +492,8 @@ export default function App() {
           onPicker={() => setPicker((v) => !v)}
           onToggleSim={() => api.settings({ simulation: !settings.simulation })}
           onToggleRail={() => api.settings({ railCollapsed: !settings.railCollapsed })}
+          onLayout={(layout) => api.settings({ layout })}
+          onCardHeight={(cardHeight) => api.settings({ cardHeight })}
         >
           <AnimatePresence>
             {picker && (
@@ -456,7 +530,12 @@ export default function App() {
               )}
             </AnimatePresence>
 
-            <div className="board" ref={boardRef}>
+            <div
+              className={`board${settings.layout === 'grid' ? ' grid' : ''}`}
+              ref={boardRef}
+              style={{ ['--card-h' as string]: `${settings.cardHeight}px` }}
+              onClick={(e) => e.target === e.currentTarget && setSelection(new Set())}
+            >
               {columns.map((col) => (
                 <Column
                   key={col.printer.id}
@@ -465,7 +544,12 @@ export default function App() {
                   dragging={colDrag?.id === col.printer.id}
                   dropTarget={overCol === col.printer.id}
                   selected={selected === col.printer.id}
+                  grid={settings.layout === 'grid'}
+                  cardHeight={settings.cardHeight}
+                  selection={selection}
                   onSelect={setSelected}
+                  onSelectJob={selectJob}
+                  onMenuJob={openMenu}
                   onPreview={setPreview}
                   onDropFiles={addFiles}
                   onAdd={() => pickFiles(col.printer.id)}
@@ -511,6 +595,39 @@ export default function App() {
 
         <AnimatePresence>
           {preview && <PreviewModal job={preview} onClose={() => setPreview(null)} />}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {menu && (
+            <ContextMenu
+              target={menu}
+              printers={visiblePrinters}
+              onMove={(printerId) => {
+                const ids = menu.jobIds
+                setMenu(null)
+                void moveMany(ids, printerId)
+              }}
+              onPreview={() => {
+                const job = menuJobs()[0]
+                setMenu(null)
+                if (job) setPreview(job)
+              }}
+              onPause={() => {
+                menuJobs().forEach((j) => api.jobAction(j.id, 'pause'))
+                setMenu(null)
+              }}
+              onRetry={() => {
+                menuJobs().forEach((j) => api.jobAction(j.id, 'retry'))
+                setMenu(null)
+              }}
+              onCancel={() => {
+                menuJobs().forEach((j) => api.jobAction(j.id, 'cancel'))
+                setMenu(null)
+                setSelection(new Set())
+              }}
+              onClose={() => setMenu(null)}
+            />
+          )}
         </AnimatePresence>
 
         <Toasts items={toasts} onClose={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Settings } from '../../shared/types'
-import { IcoList, IcoPlus, IcoRail } from './icons'
+import { IcoBoard, IcoGrid, IcoList, IcoMinus, IcoPlus, IcoRail } from './icons'
 
 export type Filter = 'all' | 'active' | 'error'
 
@@ -15,8 +15,14 @@ interface Props {
   onPicker: () => void
   onToggleSim: () => void
   onToggleRail: () => void
+  onLayout: (value: 'board' | 'grid') => void
+  onCardHeight: (value: number) => void
   children?: ReactNode
 }
+
+export const CARD_MIN = 140
+export const CARD_MAX = 640
+const CARD_STEP = 40
 
 const FILTERS: Array<[Filter, string]> = [
   ['all', 'Все'],
@@ -35,8 +41,11 @@ export function Toolbar({
   onPicker,
   onToggleSim,
   onToggleRail,
+  onLayout,
+  onCardHeight,
   children,
 }: Props) {
+  const grid = settings.layout === 'grid'
   return (
     <div className="toolbar">
       <button className="icon-btn tip" data-tip="Панель принтеров" onClick={onToggleRail}>
@@ -52,6 +61,42 @@ export function Toolbar({
         </button>
         {children}
       </div>
+      <div className="divider" />
+      <span className="seg">
+        <button
+          className={`icon-btn tip${grid ? '' : ' on'}`}
+          data-tip="Колонки"
+          onClick={() => onLayout('board')}
+        >
+          <IcoBoard size={14} />
+        </button>
+        <button
+          className={`icon-btn tip${grid ? ' on' : ''}`}
+          data-tip="Сетка по окну"
+          onClick={() => onLayout('grid')}
+        >
+          <IcoGrid size={14} />
+        </button>
+      </span>
+      {grid && (
+        <span className="stepper">
+          <button
+            className="icon-btn"
+            disabled={settings.cardHeight <= CARD_MIN}
+            onClick={() => onCardHeight(Math.max(CARD_MIN, settings.cardHeight - CARD_STEP))}
+          >
+            <IcoMinus size={12} />
+          </button>
+          <b>{settings.cardHeight}</b>
+          <button
+            className="icon-btn"
+            disabled={settings.cardHeight >= CARD_MAX}
+            onClick={() => onCardHeight(Math.min(CARD_MAX, settings.cardHeight + CARD_STEP))}
+          >
+            <IcoPlus size={12} />
+          </button>
+        </span>
+      )}
       <div className="divider" />
       <button className="btn btn-primary" onClick={onAdd}>
         <IcoPlus size={12} />

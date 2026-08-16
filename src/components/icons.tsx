@@ -170,6 +170,35 @@ export const IcoGrip = ({ size = 14 }: Props) => (
   </svg>
 )
 
+export const IcoBoard = ({ size = 14 }: Props) => (
+  <svg {...base(size)}>
+    <rect x="2" y="3" width="3.6" height="10" rx="1" />
+    <rect x="6.8" y="3" width="3.6" height="10" rx="1" />
+    <rect x="11.6" y="3" width="3.6" height="10" rx="1" />
+  </svg>
+)
+
+export const IcoGrid = ({ size = 14 }: Props) => (
+  <svg {...base(size)}>
+    <rect x="2.2" y="2.6" width="5.2" height="4.6" rx="1" />
+    <rect x="8.6" y="2.6" width="5.2" height="4.6" rx="1" />
+    <rect x="2.2" y="8.8" width="5.2" height="4.6" rx="1" />
+    <rect x="8.6" y="8.8" width="5.2" height="4.6" rx="1" />
+  </svg>
+)
+
+export const IcoMinus = ({ size = 14 }: Props) => (
+  <svg {...base(size)}>
+    <path d="M3.5 8h9" />
+  </svg>
+)
+
+export const IcoChevronDown = ({ size = 14 }: Props) => (
+  <svg {...base(size)}>
+    <path d="m3.5 6 4.5 4.5L12.5 6" />
+  </svg>
+)
+
 export const IcoList = ({ size = 14 }: Props) => (
   <svg {...base(size)}>
     <path d="M6 4h7.5M6 8h7.5M6 12h7.5" />

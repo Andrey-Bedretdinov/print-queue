@@ -145,6 +145,8 @@ const settings: Settings = {
   compact: false,
   hidden: [],
   order: [],
+  layout: 'board',
+  cardHeight: 240,
 }
 
 const state: AppState = { printers, jobs, incidents, settings, systemAvailable: true }
