@@ -261,6 +261,7 @@ export const mockApi: PqApi = {
     text: 'Предпросмотр доступен только в приложении.',
   }),
   thumb: async () => '',
+  jobShot: async () => ({ url: '', pages: 0 }),
   openExternal: async () => true,
   incident: async (kind, id) => {
     if (kind === 'dismiss-all') state.incidents.forEach((i) => (i.dismissed = true))

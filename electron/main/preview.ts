@@ -1,8 +1,12 @@
 import { nativeImage } from 'electron'
-import { readFile, stat, open } from 'node:fs/promises'
-import { basename, extname } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { readFile, stat, open, unlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, extname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { PreviewPayload } from '../../shared/types'
+import { CSHARP } from './spool'
+import { psJsonFile, psq } from './powershell'
 
 const IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'avif'])
 const TEXT = new Set([
@@ -69,6 +73,78 @@ export async function thumbnail(path: string) {
   }
   thumbs.set(path, url)
   return url
+}
+
+/**
+ * Снимок страницы задания прямо из очереди — для печати, пришедшей из чужой
+ * программы. Пути к файлу у спулера нет, зато есть сама страница в EMF.
+ */
+const SHOT = `
+$ErrorActionPreference = 'Stop'
+Add-Type -ReferencedAssemblies 'System.Drawing' -TypeDefinition @"
+${CSHARP}
+"@
+
+try {
+  $n = [PQSpool]::Shot('__PRN__', __JOB__, __WIDTH__, __PAGE__, '__OUT__')
+  ConvertTo-Json -Compress ([pscustomobject]@{ ok = $true; pages = $n })
+} catch {
+  $m = $_.Exception.Message
+  if ($_.Exception.InnerException) { $m = $_.Exception.InnerException.Message }
+  ConvertTo-Json -Compress ([pscustomobject]@{ ok = $false; error = $m })
+}
+`
+
+export interface JobShot {
+  url: string
+  pages: number
+  error?: string
+}
+
+const shots = new Map<string, JobShot>()
+
+/**
+ * Снимок кэшируется: одна страница крупного фото читается из спулера и
+ * перерисовывается заметное время, а очередь перерисовывается постоянно.
+ */
+export async function jobShot(
+  printer: string,
+  jobId: number,
+  width: number,
+  page = 0,
+): Promise<JobShot> {
+  const key = `${printer}#${jobId}#${width}#${page}`
+  const hit = shots.get(key)
+  if (hit) return hit
+
+  const file = join(tmpdir(), `pq-shot-${randomUUID()}.png`)
+  const script = SHOT.replace('__PRN__', psq(printer))
+    .replace('__JOB__', String(jobId))
+    .replace('__WIDTH__', String(Math.round(width)))
+    .replace('__PAGE__', String(Math.max(0, Math.round(page))))
+    .replace('__OUT__', psq(file))
+
+  let result: JobShot = { url: '', pages: 0, error: 'helper-failed' }
+  const res = await psJsonFile<{ ok: boolean; pages?: number; error?: string }>(script, 60000)
+  if (res?.ok) {
+    try {
+      const png = await readFile(file)
+      result = { url: `data:image/png;base64,${png.toString('base64')}`, pages: res.pages ?? 1 }
+    } catch {
+      result = { url: '', pages: 0, error: 'read-failed' }
+    }
+  } else if (res) {
+    result = { url: '', pages: 0, error: res.error }
+  }
+  void unlink(file).catch(() => {})
+
+  if (shots.size >= THUMB_LIMIT) {
+    const oldest = shots.keys().next().value
+    if (oldest !== undefined) shots.delete(oldest)
+  }
+  // Неудачу тоже помним: иначе наведение мышью будет дёргать спулер без конца.
+  shots.set(key, result)
+  return result
 }
 
 function decode(buf: Buffer) {

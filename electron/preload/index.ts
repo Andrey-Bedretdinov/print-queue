@@ -48,6 +48,13 @@ const api = {
   preview: (path: string): Promise<PreviewPayload> => ipcRenderer.invoke(IPC.invoke.preview, path),
   /** Уменьшенная копия снимка (data-URL) либо пустая строка. */
   thumb: (path: string): Promise<string> => ipcRenderer.invoke(IPC.invoke.thumb, path),
+  /** Снимок страницы задания из очереди — для печати из чужих программ. */
+  jobShot: (
+    jobId: string,
+    width: number,
+    page = 0,
+  ): Promise<{ url: string; pages: number; error?: string }> =>
+    ipcRenderer.invoke(IPC.invoke.jobShot, jobId, width, page),
   openExternal: (path: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.invoke.openExternal, path),
   incident: (kind: IncidentActionKind, id?: string, printerId?: string): Promise<boolean> =>

@@ -17,6 +17,8 @@ interface Props {
 }
 
 export function JobRow({ job, onPreview, overlay, selected, onSelect, onMenu }: Props) {
+  // У чужого задания файла нет, но страницу можно снять из самой очереди.
+  const canPreview = !!job.path || job.source === 'system'
   const sortable = useSortable({ id: job.id, disabled: overlay })
   const total = job.pages * job.copies
   const percent = total > 0 ? Math.min(100, (job.printedPages / total) * 100) : 0
@@ -47,7 +49,7 @@ export function JobRow({ job, onPreview, overlay, selected, onSelect, onMenu }: 
         e.stopPropagation()
         onMenu?.(job, e)
       }}
-      onDoubleClick={() => job.path && onPreview?.(job)}
+      onDoubleClick={() => canPreview && onPreview?.(job)}
       title={`${job.name} · ${pages(total)} · ${bytes(job.bytes)}`}
     >
       <FileBadge job={job} />
@@ -80,7 +82,7 @@ export function JobRow({ job, onPreview, overlay, selected, onSelect, onMenu }: 
         </span>
 
         <span className="job-acts">
-          {job.path && (
+          {canPreview && (
             <button className="icon-btn tip" data-tip="Предпросмотр" {...act(() => onPreview?.(job))}>
               <IcoEye size={12} />
             </button>

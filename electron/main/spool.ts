@@ -22,9 +22,12 @@ import { psJson, psJsonFile, psq } from './powershell'
  * которые пришли не в EMF, и только когда драйвер у принтеров общий.
  */
 
-const HELPER = `
-$ErrorActionPreference = 'Stop'
-Add-Type -TypeDefinition @"
+/**
+ * Класс целиком отдаётся наружу: тем же разбором контейнера пользуется снимок
+ * задания для превью (`preview.ts`), а держать две копии кода, который лезет в
+ * winspool через P/Invoke, — верный способ починить одну и забыть другую.
+ */
+export const CSHARP = `
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -261,6 +264,63 @@ public static class PQSpool
             pos = (int)next;
         }
         return pages;
+    }
+
+    /**
+     * Снимок задания для превью. У спулера нет исходного файла — печать пришла
+     * из чужой программы, — но сама страница у него есть готовым EMF. Играем её
+     * не в принтерный DC, а в растр в памяти: получается ровно то, что уедет на
+     * бумагу. Отдаём файлом, потому что мегабайтную картинку через stdout
+     * PowerShell гнать незачем.
+     */
+    public static int Shot(string printer, uint jobId, int width, int page, string outPath)
+    {
+        byte[] data = ReadJob(printer, jobId);
+        List<byte[]> pages = Pages(data);
+        if (pages.Count == 0) throw new Exception("no-emf");
+        if (page < 0 || page >= pages.Count) page = 0;
+        Render(pages[page], width, outPath);
+        return pages.Count;
+    }
+
+    /** Отрисовка одной страницы в PNG. Вынесена, чтобы её можно было прогнать
+     *  на заведомо корректном EMF, не поднимая очередь печати. */
+    public static void Render(byte[] emf, int width, string outPath)
+    {
+        // rclFrame заголовка EMF — размер страницы в сотых долях миллиметра.
+        double wmm = (BitConverter.ToInt32(emf, 32) - BitConverter.ToInt32(emf, 24)) / 100.0;
+        double hmm = (BitConverter.ToInt32(emf, 36) - BitConverter.ToInt32(emf, 28)) / 100.0;
+        if (wmm <= 0 || hmm <= 0) { wmm = 210; hmm = 297; }
+
+        int w = width < 32 ? 32 : width;
+        int h = (int)Math.Round(w * hmm / wmm);
+        if (h < 1) h = 1;
+        if (h > 6000) h = 6000;
+
+        IntPtr hemf = SetEnhMetaFileBits((uint)emf.Length, emf);
+        if (hemf == IntPtr.Zero) throw new Exception("emf-bits:" + Marshal.GetLastWin32Error());
+        try
+        {
+            using (System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(w, h))
+            {
+                using (System.Drawing.Graphics g = System.Drawing.Graphics.FromImage(bmp))
+                {
+                    // Лист бумаги белый; без заливки прозрачный фон даст чёрный PNG.
+                    g.Clear(System.Drawing.Color.White);
+                    IntPtr hdc = g.GetHdc();
+                    try
+                    {
+                        RECT r;
+                        r.left = 0; r.top = 0; r.right = w; r.bottom = h;
+                        if (!PlayEnhMetaFile(hdc, hemf, ref r))
+                            throw new Exception("play:" + Marshal.GetLastWin32Error());
+                    }
+                    finally { g.ReleaseHdc(hdc); }
+                }
+                bmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
+            }
+        }
+        finally { DeleteEnhMetaFile(hemf); }
     }
 
     /** DEVMODE источника из контейнера — нужен, чтобы забрать ориентацию и формат. */
@@ -506,6 +566,12 @@ public static class PQSpool
         }
     }
 }
+`
+
+const HELPER = `
+$ErrorActionPreference = 'Stop'
+Add-Type -ReferencedAssemblies 'System.Drawing' -TypeDefinition @"
+${CSHARP}
 "@
 
 try {

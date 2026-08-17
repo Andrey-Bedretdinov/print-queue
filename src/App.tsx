@@ -510,7 +510,8 @@ export default function App() {
       y: e.clientY,
       jobIds: ids,
       printerId: job.printerId,
-      canPreview: ids.length === 1 && !!job.path,
+      // Страницу системного задания показываем снимком из очереди — файл не нужен.
+      canPreview: ids.length === 1 && (!!job.path || job.source === 'system'),
       canPause: jobs.some((j) => j.state === 'queued' || j.state === 'printing'),
       canRetry: jobs.some((j) => j.state === 'error' && j.source === 'sim'),
     })

@@ -23,6 +23,23 @@ function thumbOf(path: string) {
   return pending
 }
 
+/**
+ * Задание из чужой программы: файла нет, зато у спулера есть сама страница.
+ * Снимок стоит чтения задания целиком, поэтому берётся лениво — по наведению,
+ * а не для всей очереди сразу.
+ */
+function shotOf(jobId: string) {
+  let pending = cache.get(jobId)
+  if (!pending) {
+    pending = api
+      .jobShot(jobId, 220)
+      .then((shot) => shot.url)
+      .catch(() => '')
+    cache.set(jobId, pending)
+  }
+  return pending
+}
+
 /** Увеличение не должно вылезать за экран и не должно перекрывать саму строку. */
 const POP = 232
 
@@ -35,11 +52,14 @@ function place(rect: DOMRect) {
 
 export function FileBadge({ job }: { job: Job }) {
   const ref = useRef<HTMLSpanElement>(null)
+  const over = useRef(false)
   const [thumb, setThumb] = useState('')
+  const [busy, setBusy] = useState(false)
   const [at, setAt] = useState<{ left: number; top: number } | null>(null)
 
   const path = job.path
   const isImage = !!path && IMAGE.has(job.ext.replace(/^\./, '').toLowerCase())
+  const fromQueue = !path && job.source === 'system'
 
   useEffect(() => {
     if (!isImage || !path) return
@@ -65,19 +85,36 @@ export function FileBadge({ job }: { job: Job }) {
     }
   }, [at])
 
-  const show = () => {
+  const popup = (url: string) => {
     const rect = ref.current?.getBoundingClientRect()
-    if (thumb && rect) setAt(place(rect))
+    if (url && rect) setAt(place(rect))
+  }
+
+  const show = () => {
+    over.current = true
+    if (thumb) return popup(thumb)
+    if (!fromQueue || busy) return
+    setBusy(true)
+    void shotOf(job.id).then((url) => {
+      setBusy(false)
+      if (!url) return
+      setThumb(url)
+      // Курсор мог уже уехать, пока спулер отдавал страницу.
+      if (over.current) popup(url)
+    })
   }
 
   return (
     <>
       <span
         ref={ref}
-        className={`ftype${thumb ? ' shot' : ''}`}
+        className={`ftype${thumb ? ' shot' : ''}${busy ? ' busy' : ''}`}
         style={thumb ? undefined : { background: typeColor(job.ext) }}
         onMouseEnter={show}
-        onMouseLeave={() => setAt(null)}
+        onMouseLeave={() => {
+          over.current = false
+          setAt(null)
+        }}
       >
         {thumb ? <img src={thumb} alt="" draggable={false} /> : typeLabel(job.ext)}
       </span>

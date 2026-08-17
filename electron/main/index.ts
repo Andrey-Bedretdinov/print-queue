@@ -7,7 +7,8 @@ import type { JobActionKind, PrinterActionKind, ToastMessage } from '../../share
 import type { AppState, Settings } from '../../shared/types'
 import { initStore, store } from './store'
 import { PrintManager } from './manager'
-import { buildPreview, thumbnail } from './preview'
+import { buildPreview, jobShot, thumbnail } from './preview'
+import { jobRef } from './windows-source'
 import { psRun } from './powershell'
 
 process.env.APP_ROOT = join(__dirname, '..', '..')
@@ -144,6 +145,13 @@ ipcMain.handle(IPC.invoke.pickFiles, async () => {
 
 ipcMain.handle(IPC.invoke.preview, (_e, path: string) => buildPreview(path))
 ipcMain.handle(IPC.invoke.thumb, (_e, path: string) => thumbnail(path))
+
+/** Снимок страницы системного задания: идентификатор вида «sys:Принтер:17». */
+ipcMain.handle(IPC.invoke.jobShot, (_e, id: string, width: number, page: number) => {
+  if (!id.startsWith('sys:')) return { url: '', pages: 0, error: 'not-system' }
+  const { printer, id: jobId } = jobRef(id)
+  return jobShot(printer, jobId, width, page)
+})
 
 ipcMain.handle(IPC.invoke.openExternal, async (_e, path: string) => {
   const err = await shell.openPath(path)

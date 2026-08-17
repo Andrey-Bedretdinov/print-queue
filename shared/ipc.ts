@@ -12,6 +12,7 @@ export const IPC = {
     pickFiles: 'pq:pick-files',
     preview: 'pq:preview',
     thumb: 'pq:thumb',
+    jobShot: 'pq:job-shot',
     openExternal: 'pq:open-external',
     incident: 'pq:incident',
     settings: 'pq:settings',
