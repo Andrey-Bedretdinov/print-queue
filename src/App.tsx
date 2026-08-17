@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type { AppState, Job, Printer } from '../shared/types'
 import type { ToastMessage } from '../shared/ipc'
 import { api } from './lib/api'
+import { playStartSound } from './lib/sounds'
 import { TitleBar } from './components/TitleBar'
 import { Toolbar, type Filter } from './components/Toolbar'
 import { Rail } from './components/Rail'
@@ -88,6 +89,29 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = state?.settings.theme ?? 'light'
   }, [state?.settings.theme])
+
+  /**
+   * Отбивка на старт печати. Сравниваем с прошлым снимком очереди: интересен
+   * переход в «печатается», а не сам факт. Первый снимок молчит — то, что уже
+   * шло до запуска приложения, новостью не является.
+   */
+  const printingRef = useRef<Set<string> | null>(null)
+
+  useEffect(() => {
+    const jobs = state?.jobs
+    if (!jobs) return
+    const now = new Set(jobs.filter((j) => j.state === 'printing').map((j) => j.id))
+    const seen = printingRef.current
+    printingRef.current = now
+    if (!seen || !state?.settings.sound) return
+    // Пачка заданий стартует разом — звук один, а не хор.
+    for (const id of now) {
+      if (!seen.has(id)) {
+        playStartSound()
+        break
+      }
+    }
+  }, [state?.jobs, state?.settings.sound])
 
   /**
    * После переноса очередь какое-то время отдаёт ещё дореносное состояние.
@@ -555,7 +579,16 @@ export default function App() {
   if (!state || !settings) {
     return (
       <div className="app">
-        <TitleBar query="" onQuery={() => {}} alerts={0} onAlerts={() => {}} theme="light" onTheme={() => {}} />
+        <TitleBar
+          query=""
+          onQuery={() => {}}
+          alerts={0}
+          onAlerts={() => {}}
+          theme="light"
+          onTheme={() => {}}
+          sound={false}
+          onSound={() => {}}
+        />
         <div />
         <div className="blank" style={{ alignContent: 'center' }}>
           Подключение к спулеру…
@@ -593,6 +626,12 @@ export default function App() {
           onAlerts={() => setDrawer((v) => !v)}
           theme={settings.theme}
           onTheme={() => api.settings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
+          sound={settings.sound}
+          onSound={() => {
+            // Включение слышно сразу: иначе непонятно, что именно включилось.
+            if (!settings.sound) playStartSound()
+            void api.settings({ sound: !settings.sound })
+          }}
         />
 
         <Toolbar

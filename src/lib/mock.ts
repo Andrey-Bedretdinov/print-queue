@@ -148,6 +148,7 @@ const settings: Settings = {
   layout: 'board',
   cardHeight: 240,
   cardAuto: true,
+  sound: true,
   prepared: [],
 }
 

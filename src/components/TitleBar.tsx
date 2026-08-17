@@ -6,6 +6,8 @@ import {
   IcoMax,
   IcoMin,
   IcoMoon,
+  IcoMute,
+  IcoSound,
   IcoPrinter,
   IcoSearch,
   IcoSun,
@@ -19,9 +21,20 @@ interface Props {
   onAlerts: () => void
   theme: 'light' | 'dark'
   onTheme: () => void
+  sound: boolean
+  onSound: () => void
 }
 
-export function TitleBar({ query, onQuery, alerts, onAlerts, theme, onTheme }: Props) {
+export function TitleBar({
+  query,
+  onQuery,
+  alerts,
+  onAlerts,
+  theme,
+  onTheme,
+  sound,
+  onSound,
+}: Props) {
   const [maximized, setMaximized] = useState(false)
 
   useEffect(() => api.onWindowState(setMaximized), [])
@@ -83,6 +96,14 @@ export function TitleBar({ query, onQuery, alerts, onAlerts, theme, onTheme }: P
 
       <button className="icon-btn tip" data-tip="Тема" onClick={onTheme}>
         {theme === 'dark' ? <IcoSun size={14} /> : <IcoMoon size={14} />}
+      </button>
+
+      <button
+        className={`icon-btn tip${sound ? ' on' : ''}`}
+        data-tip={sound ? 'Звук при печати' : 'Звук выключен'}
+        onClick={onSound}
+      >
+        {sound ? <IcoSound size={14} /> : <IcoMute size={14} />}
       </button>
 
       <div className="win-btns">

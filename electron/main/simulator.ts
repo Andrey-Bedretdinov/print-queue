@@ -1,5 +1,5 @@
-import { basename, extname } from 'node:path'
-import type { Consumable, Job, JobFailure, Printer } from '../../shared/types'
+import { basename } from 'node:path'
+import { extOf, type Consumable, type Job, type JobFailure, type Printer } from '../../shared/types'
 import { signatureOf } from './signature'
 
 interface Profile {
@@ -175,14 +175,19 @@ export class Simulator {
 
   seed(files: JobSeed[]) {
     if (!files.length) return
+    // Первые пять файлов — снимки: на цветной Canon уходят они, на лазерные —
+    // документы. Так эмуляция показывает и миниатюры, и предпросмотр.
     const plan: Array<[string, number, Job['state']?, JobFailure?]> = [
-      ['sim:hp-m404', 0],
-      ['sim:hp-m404', 1],
+      ['sim:canon-ts8340', 0],
+      ['sim:canon-ts8340', 1],
       ['sim:canon-ts8340', 2],
-      ['sim:kyocera-p3145', 3, 'error', 'paper_jam'],
-      ['sim:kyocera-p3145', 4],
-      ['sim:zebra-zd421', 5],
+      ['sim:hp-m404', 3],
+      ['sim:hp-m404', 5],
       ['sim:hp-m404', 6],
+      ['sim:kyocera-p3145', 7, 'error', 'paper_jam'],
+      ['sim:kyocera-p3145', 8],
+      ['sim:zebra-zd421', 9],
+      ['sim:zebra-zd421', 4],
     ]
     for (const [printerId, idx, state, failure] of plan) {
       const file = files[idx % files.length]
@@ -206,7 +211,7 @@ export class Simulator {
       id: nextId('j'),
       printerId,
       name,
-      ext: extname(name).slice(1).toLowerCase(),
+      ext: extOf(name),
       path: seed.path,
       bytes: seed.bytes,
       pages: Math.max(1, seed.pages),

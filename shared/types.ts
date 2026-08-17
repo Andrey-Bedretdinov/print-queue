@@ -1,5 +1,20 @@
 /** Domain model shared between the Electron main process and the renderer. */
 
+/**
+ * Расширение из имени задания. Спулер отдаёт имя документа так, как его назвала
+ * программа: Lightroom печатает «Lightroom (_MG_0114.CR2)», и наивный разбор по
+ * последней точке даёт «cr2)» со скобкой — после чего снимок перестаёт быть
+ * снимком для всего остального кода.
+ */
+export function extOf(name: string) {
+  const dot = name.lastIndexOf('.')
+  if (dot < 0) return ''
+  // Только первое слово после точки: спулер дописывает к имени и скобки, и
+  // собственные пометки — «snapshot.jpg 264 01485» должно дать «jpg».
+  const tail = name.slice(dot + 1).match(/^[\p{L}\p{N}]+/u)
+  return tail ? tail[0].toLowerCase() : ''
+}
+
 export type ConnectionKind = 'network' | 'usb' | 'virtual'
 
 export type PrinterState =
@@ -110,6 +125,8 @@ export interface Settings {
   cardHeight: number
   /** Подгонять высоту блоков под окно, чтобы не оставалось пустого места. */
   cardAuto: boolean
+  /** Голосовая отбивка, когда задание пошло в печать. */
+  sound: boolean
   /** Принтеры, которым приложение включило сохранение файла задания. */
   prepared: string[]
 }

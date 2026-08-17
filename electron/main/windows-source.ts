@@ -1,5 +1,5 @@
 import { psJson, psRun, psq } from './powershell'
-import type { ConnectionKind, Job, JobFailure, Printer, PrinterState } from '../../shared/types'
+import { extOf, type ConnectionKind, type Job, type JobFailure, type Printer, type PrinterState } from '../../shared/types'
 import { signatureOf } from './signature'
 import { pathForJob, rememberPrinted } from './origins'
 
@@ -208,8 +208,7 @@ export function parseSystem(raw: RawSnapshot): { printers: Printer[]; jobs: Job[
       failure = failure ?? 'spool_error'
     }
     const name = j.Document || `Задание ${j.JobId}`
-    const dot = name.lastIndexOf('.')
-    const ext = dot > 0 ? name.slice(dot + 1).toLowerCase() : ''
+    const ext = extOf(name)
     return {
       id: `sys:${j.Printer}:${j.JobId}`,
       printerId: idFor(j.Printer),

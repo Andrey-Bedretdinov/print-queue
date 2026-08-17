@@ -19,6 +19,10 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'pq-file', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ])
 
+// Отбивка на старт печати звучит сама по себе, без клика: Chromium иначе ждёт
+// действия пользователя и молча гасит звук.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+
 let win: BrowserWindow | null = null
 let manager: PrintManager | null = null
 

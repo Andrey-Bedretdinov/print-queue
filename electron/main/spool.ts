@@ -188,7 +188,7 @@ public static class PQSpool
     }
 
     /** Спул-данные задания — прямо у спулера, минуя каталог со спул-файлами. */
-    static byte[] ReadJob(string printer, uint jobId)
+    public static byte[] ReadJob(string printer, uint jobId)
     {
         IntPtr h;
         // Именно нулевые PRINTER_DEFAULTS: с PRINTER_ACCESS_USE спулер

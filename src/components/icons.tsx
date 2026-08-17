@@ -170,6 +170,21 @@ export const IcoGrip = ({ size = 14 }: Props) => (
   </svg>
 )
 
+export const IcoSound = ({ size = 14 }: Props) => (
+  <svg {...base(size)}>
+    <path d="M3 6.2h2.4L8.6 3.4v9.2L5.4 9.8H3z" />
+    <path d="M10.8 6.2a2.6 2.6 0 0 1 0 3.6" />
+    <path d="M12.6 4.4a5.2 5.2 0 0 1 0 7.2" />
+  </svg>
+)
+
+export const IcoMute = ({ size = 14 }: Props) => (
+  <svg {...base(size)}>
+    <path d="M3 6.2h2.4L8.6 3.4v9.2L5.4 9.8H3z" />
+    <path d="m10.8 6.4 3.2 3.2M14 6.4l-3.2 3.2" />
+  </svg>
+)
+
 export const IcoShield = ({ size = 14 }: Props) => (
   <svg {...base(size)}>
     <path d="M8 2 3 4v4c0 3 2.2 5.2 5 6 2.8-.8 5-3 5-6V4z" />

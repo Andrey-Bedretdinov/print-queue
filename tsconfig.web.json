@@ -15,7 +15,7 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "composite": true,
-    "types": ["node"]
+    "types": ["node", "vite/client"]
   },
   "include": ["src", "shared", "electron/preload"]
 }

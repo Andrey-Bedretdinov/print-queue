@@ -4,8 +4,16 @@ import type { Job } from '../../shared/types'
 import { api } from '../lib/api'
 import { typeColor, typeLabel } from '../lib/format'
 
-/** Что вообще имеет смысл показывать картинкой, а не подписью с расширением. */
-const IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif'])
+/**
+ * Что имеет смысл показывать картинкой. Список шире, чем понимает браузер:
+ * TIFF, HEIC и RAW раскодирует главный процесс силами Windows.
+ */
+const IMAGE = new Set([
+  'png', 'jpg', 'jpeg', 'jpe', 'jfif', 'gif', 'webp', 'bmp', 'dib', 'ico', 'avif',
+  'tif', 'tiff', 'heic', 'heif', 'jxr', 'wdp', 'hdp',
+  'cr2', 'cr3', 'crw', 'nef', 'nrw', 'arw', 'srf', 'sr2', 'raf', 'orf',
+  'rw2', 'raw', 'dng', 'pef', 'srw', 'x3f', '3fr', 'iiq',
+])
 
 /**
  * Миниатюра одна на файл: строка в очереди и увеличение по наведению берут её

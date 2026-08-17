@@ -1,14 +1,15 @@
-import { nativeImage } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { readFile, stat, open, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, extname, join } from 'node:path'
+import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { PreviewPayload } from '../../shared/types'
+import { extOf, type PreviewPayload } from '../../shared/types'
 import { CSHARP } from './spool'
 import { psJsonFile, psq } from './powershell'
+import { BROWSER, PHOTO, decodePhoto } from './photo'
 
-const IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'avif'])
+/** Фотоформаты и то, чем их раскодировать, вынесены в photo.ts. */
+const IMAGE = PHOTO
 const TEXT = new Set([
   'txt', 'log', 'csv', 'tsv', 'json', 'xml', 'md', 'yml', 'yaml', 'ini', 'cfg', 'sql',
   'js', 'ts', 'tsx', 'jsx', 'css', 'html', 'py', 'ps1', 'bat', 'sh', 'c', 'h', 'cpp', 'cs', 'go', 'rs',
@@ -34,7 +35,7 @@ export function previewUrl(path: string) {
  * Уменьшенная копия снимка для очереди: и в значок строки, и в увеличение по
  * наведению. Отдавать в интерфейс сам файл нельзя — в фотоочереди это десятки
  * мегабайт на строку, которые браузер честно раскодирует целиком ради шестнадцати
- * пикселей. nativeImage умеет это сам, без сторонних библиотек.
+ * пикселей.
  */
 const THUMB_WIDTH = 220
 const THUMB_LIMIT = 200
@@ -44,27 +45,7 @@ export async function thumbnail(path: string) {
   const hit = thumbs.get(path)
   if (hit !== undefined) return hit
 
-  let url = ''
-  try {
-    const ext = extname(path).slice(1).toLowerCase()
-    if (IMAGE.has(ext)) {
-      const image = nativeImage.createFromPath(path)
-      if (!image.isEmpty()) {
-        const small =
-          image.getSize().width > THUMB_WIDTH
-            ? image.resize({ width: THUMB_WIDTH, quality: 'good' })
-            : image
-        // Фотографии уезжают JPEG'ом: PNG с той же картинки тяжелее на порядок,
-        // а прозрачности в снимке всё равно нет.
-        url =
-          ext === 'jpg' || ext === 'jpeg'
-            ? `data:image/jpeg;base64,${small.toJPEG(78).toString('base64')}`
-            : small.toDataURL()
-      }
-    }
-  } catch {
-    /* нечитаемый файл — строка обойдётся значком с расширением */
-  }
+  const url = await decodePhoto(path, THUMB_WIDTH)
 
   // Кэш держит только последние снимки: очередь живёт долго, память — нет.
   if (thumbs.size >= THUMB_LIMIT) {
@@ -95,6 +76,72 @@ try {
 }
 `
 
+/**
+ * Второй путь: современные драйверы (в том числе классовый HP) спулят не EMF, а
+ * XPS — тот же документ, только упакованный. Разбирать его вручную незачем,
+ * WPF открывает такой пакет и отдаёт страницу как визуальный элемент, который
+ * рисуется в растр штатным RenderTargetBitmap.
+ */
+const XPS = `
+$ErrorActionPreference = 'Stop'
+Add-Type -ReferencedAssemblies 'System.Drawing' -TypeDefinition @"
+${CSHARP}
+"@
+Add-Type -AssemblyName ReachFramework
+Add-Type -AssemblyName PresentationCore
+Add-Type -AssemblyName PresentationFramework
+Add-Type -AssemblyName WindowsBase
+
+$temp = [System.IO.Path]::Combine($env:TEMP, [System.Guid]::NewGuid().ToString() + '.xps')
+try {
+  $data = [PQSpool]::ReadJob('__PRN__', __JOB__)
+  if ($data.Length -lt 4 -or $data[0] -ne 0x50 -or $data[1] -ne 0x4B) { throw 'not-xps' }
+  [System.IO.File]::WriteAllBytes($temp, $data)
+
+  $doc = New-Object System.Windows.Xps.Packaging.XpsDocument($temp, 'Read')
+  try {
+    $paginator = $doc.GetFixedDocumentSequence().DocumentPaginator
+    $total = $paginator.PageCount
+    $index = [Math]::Min([Math]::Max(__PAGE__, 0), $total - 1)
+    $page = $paginator.GetPage($index)
+
+    $scale = [double]__WIDTH__ / $page.Size.Width
+    $w = [int][Math]::Round($page.Size.Width * $scale)
+    $h = [int][Math]::Round($page.Size.Height * $scale)
+
+    # Лист бумаги белый: XPS-страница фон рисует не всегда, а прозрачный PNG в
+    # очереди выглядит дырой.
+    $container = New-Object System.Windows.Media.ContainerVisual
+    $container.Transform = New-Object System.Windows.Media.ScaleTransform($scale, $scale)
+    $sheet = New-Object System.Windows.Media.DrawingVisual
+    $ctx = $sheet.RenderOpen()
+    $ctx.DrawRectangle([System.Windows.Media.Brushes]::White, $null,
+      (New-Object System.Windows.Rect(0, 0, $page.Size.Width, $page.Size.Height)))
+    $ctx.Close()
+    # Children.Add возвращает индекс, и он уходит в stdout поверх JSON.
+    $null = $container.Children.Add($sheet)
+    $null = $container.Children.Add($page.Visual)
+
+    $bitmap = New-Object System.Windows.Media.Imaging.RenderTargetBitmap(
+      $w, $h, 96, 96, [System.Windows.Media.PixelFormats]::Pbgra32)
+    $bitmap.Render($container)
+
+    $encoder = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
+    $encoder.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($bitmap))
+    $out = New-Object System.IO.FileStream('__OUT__', 'Create')
+    try { $encoder.Save($out) } finally { $out.Close() }
+
+    ConvertTo-Json -Compress ([pscustomobject]@{ ok = $true; pages = $total })
+  } finally { $doc.Close() }
+} catch {
+  $m = $_.Exception.Message
+  if ($_.Exception.InnerException) { $m = $_.Exception.InnerException.Message }
+  ConvertTo-Json -Compress ([pscustomobject]@{ ok = $false; error = $m })
+} finally {
+  if (Test-Path $temp) { Remove-Item $temp -Force -ErrorAction SilentlyContinue }
+}
+`
+
 export interface JobShot {
   url: string
   pages: number
@@ -118,14 +165,20 @@ export async function jobShot(
   if (hit) return hit
 
   const file = join(tmpdir(), `pq-shot-${randomUUID()}.png`)
-  const script = SHOT.replace('__PRN__', psq(printer))
-    .replace('__JOB__', String(jobId))
-    .replace('__WIDTH__', String(Math.round(width)))
-    .replace('__PAGE__', String(Math.max(0, Math.round(page))))
-    .replace('__OUT__', psq(file))
+  const fill = (template: string) =>
+    template
+      .replace(/__PRN__/g, psq(printer))
+      .replace(/__JOB__/g, String(jobId))
+      .replace(/__WIDTH__/g, String(Math.round(width)))
+      .replace(/__PAGE__/g, String(Math.max(0, Math.round(page))))
+      .replace(/__OUT__/g, psq(file))
 
   let result: JobShot = { url: '', pages: 0, error: 'helper-failed' }
-  const res = await psJsonFile<{ ok: boolean; pages?: number; error?: string }>(script, 60000)
+  let res = await psJsonFile<{ ok: boolean; pages?: number; error?: string }>(fill(SHOT), 60000)
+  // Драйвер спулит не EMF, а XPS — тогда страницу рисует WPF.
+  if (res && !res.ok && res.error === 'no-emf') {
+    res = await psJsonFile<{ ok: boolean; pages?: number; error?: string }>(fill(XPS), 60000)
+  }
   if (res?.ok) {
     try {
       const png = await readFile(file)
@@ -159,7 +212,7 @@ function decode(buf: Buffer) {
 
 /** Cheap page estimate: enough for a queue view, no parsing libraries needed. */
 export async function estimatePages(path: string, bytes: number) {
-  const ext = extname(path).slice(1).toLowerCase()
+  const ext = extOf(path)
   if (IMAGE.has(ext)) return 1
   if (ext === 'pdf') {
     try {
@@ -193,7 +246,7 @@ export async function estimatePages(path: string, bytes: number) {
 
 export async function buildPreview(path: string): Promise<PreviewPayload> {
   const name = basename(path)
-  const ext = extname(path).slice(1).toLowerCase()
+  const ext = extOf(path)
   let bytes = 0
   let modified: number | undefined
   try {
@@ -205,7 +258,22 @@ export async function buildPreview(path: string): Promise<PreviewPayload> {
   }
   const pages = await estimatePages(path, bytes)
   if (IMAGE.has(ext)) {
-    return { kind: 'image', name, ext, bytes, pages, modified, path, url: previewUrl(path) }
+    // Что браузер покажет сам — отдаём ссылкой, в полном качестве и без работы.
+    // TIFF, HEIC и RAW он не знает: их раскодирует Windows, и в окно уезжает
+    // уменьшенная копия — на экран её хватает с запасом.
+    const url = BROWSER.has(ext) ? previewUrl(path) : await decodePhoto(path, 1800)
+    return url
+      ? { kind: 'image', name, ext, bytes, pages, modified, path, url }
+      : {
+          kind: 'none',
+          name,
+          ext,
+          bytes,
+          pages,
+          modified,
+          path,
+          note: 'Windows не знает этот формат — поставьте расширение для него из Microsoft Store',
+        }
   }
   if (ext === 'pdf') {
     return { kind: 'pdf', name, ext, bytes, pages, modified, path, url: previewUrl(path) }

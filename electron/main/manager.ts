@@ -3,7 +3,7 @@ import { basename } from 'node:path'
 import { stat } from 'node:fs/promises'
 import type { AppState, Incident, Job, Printer, Settings } from '../../shared/types'
 import type { ToastMessage } from '../../shared/ipc'
-import { Simulator, isOpen } from './simulator'
+import { Simulator, isOpen, type JobSeed } from './simulator'
 import { ensureSamples } from './samples'
 import { estimatePages } from './preview'
 import { store } from './store'
@@ -45,17 +45,45 @@ export class PrintManager {
   }
 
   private seeded = false
+  private samples: JobSeed[] = []
+
+  /** Образцы готовятся один раз: файлы пишутся на диск при первом обращении. */
+  private files() {
+    if (!this.samples.length) this.samples = ensureSamples()
+    return this.samples
+  }
 
   /** Демо-очереди появляются только когда эмуляция включена. */
   private ensureSeed() {
     if (this.seeded) return
     this.seeded = true
-    this.sim.seed(ensureSamples())
+    this.sim.seed(this.files())
     for (const job of this.sim.jobs) {
       if (job.state !== 'error') continue
       const printer = this.sim.printers.find((p) => p.id === job.printerId)
       if (printer) this.openIncident(job, printer)
     }
+  }
+
+  /**
+   * Свежая пачка заданий на каждое включение эмуляции: пустая доска после
+   * повторного включения выглядит как «ничего не работает», а смотреть на ней
+   * нечего. Файлы и принтеры берутся вразнобой, чтобы очередь не повторялась.
+   */
+  private topUp(min = 3, max = 5) {
+    const files = this.files()
+    if (!files.length) return
+    const printers = this.sim.printers.filter((p) => p.state !== 'offline')
+    if (!printers.length) return
+
+    const count = min + Math.floor(Math.random() * (max - min + 1))
+    for (let i = 0; i < count; i++) {
+      const file = files[Math.floor(Math.random() * files.length)]
+      const printer = printers[Math.floor(Math.random() * printers.length)]
+      this.sim.add(printer.id, file)
+    }
+    this.markDirty()
+    this.push(true)
   }
 
   start() {
@@ -466,8 +494,14 @@ export class PrintManager {
   }
 
   updateSettings(patch: Partial<Settings>) {
+    const was = store.settings.simulation
     const next = store.patchSettings(patch)
-    if (next.simulation) this.ensureSeed()
+    if (next.simulation) {
+      // Первое включение разворачивает демо-очередь целиком, каждое следующее
+      // подкидывает свежую пачку — иначе включать нечего.
+      if (!this.seeded) this.ensureSeed()
+      else if (!was) this.topUp()
+    }
     this.markDirty()
     this.push(true)
     return next
