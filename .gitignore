@@ -7,3 +7,7 @@ build/icon.png
 *.tsbuildinfo
 .DS_Store
 .vite/
+
+# Дампы состояния стенда: адреса, серийники, имена файлов — репозиторий публичный
+handoff/
+pq-snapshot.txt
