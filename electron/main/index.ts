@@ -41,7 +41,12 @@ function createWindow() {
     minHeight: 520,
     show: false,
     frame: false,
-    backgroundColor: store.settings.theme === 'dark' ? '#1b2434' : '#edeef0',
+    backgroundColor:
+      store.settings.theme === 'dark'
+        ? '#1b2434'
+        : store.settings.theme === 'pink'
+          ? '#fff4f8'
+          : '#edeef0',
     icon: join(process.env.APP_ROOT!, 'build', 'icon.png'),
     webPreferences: {
       preload: join(__dirname, '..', 'preload', 'index.js'),
@@ -81,7 +86,8 @@ app.on('second-instance', () => {
 
 app.whenReady().then(() => {
   initStore()
-  nativeTheme.themeSource = store.settings.theme
+  // nativeTheme знает только светлую и тёмную; розовая для него светлая.
+  nativeTheme.themeSource = store.settings.theme === 'dark' ? 'dark' : 'light'
 
   protocol.handle('pq-file', (request) => {
     const url = new URL(request.url)
@@ -167,7 +173,7 @@ ipcMain.handle(IPC.invoke.incident, (_e, kind: string, id?: string, printerId?: 
 )
 
 ipcMain.handle(IPC.invoke.settings, (_e, patch: Partial<Settings>) => {
-  if (patch.theme) nativeTheme.themeSource = patch.theme
+  if (patch.theme) nativeTheme.themeSource = patch.theme === 'dark' ? 'dark' : 'light'
   return manager?.updateSettings(patch)
 })
 

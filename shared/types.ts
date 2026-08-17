@@ -15,6 +15,11 @@ export function extOf(name: string) {
   return tail ? tail[0].toLowerCase() : ''
 }
 
+/** Светлая и тёмная — рабочие, розовая — с сердечками и котом на действия. */
+export type Theme = 'light' | 'dark' | 'pink'
+
+export const THEMES: Theme[] = ['light', 'dark', 'pink']
+
 export type ConnectionKind = 'network' | 'usb' | 'virtual'
 
 export type PrinterState =
@@ -110,7 +115,7 @@ export interface Incident {
 }
 
 export interface Settings {
-  theme: 'light' | 'dark'
+  theme: Theme
   simulation: boolean
   pollMs: number
   railCollapsed: boolean

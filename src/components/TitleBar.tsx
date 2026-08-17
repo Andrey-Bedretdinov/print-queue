@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
+import type { Theme } from '../../shared/types'
 import { api } from '../lib/api'
+
+const THEME_TIP: Record<Theme, string> = {
+  light: 'Тёмная тема',
+  dark: 'Розовая тема',
+  pink: 'Светлая тема',
+}
 import {
   IcoBell,
+  IcoHeart,
   IcoClose,
   IcoMax,
   IcoMin,
@@ -19,7 +27,7 @@ interface Props {
   onQuery: (value: string) => void
   alerts: number
   onAlerts: () => void
-  theme: 'light' | 'dark'
+  theme: Theme
   onTheme: () => void
   sound: boolean
   onSound: () => void
@@ -94,8 +102,19 @@ export function TitleBar({
         )}
       </button>
 
-      <button className="icon-btn tip" data-tip="Тема" onClick={onTheme}>
-        {theme === 'dark' ? <IcoSun size={14} /> : <IcoMoon size={14} />}
+      {/* Значок показывает, что будет по нажатию: светлая → тёмная → розовая */}
+      <button
+        className={`icon-btn tip${theme === 'pink' ? ' on' : ''}`}
+        data-tip={THEME_TIP[theme]}
+        onClick={onTheme}
+      >
+        {theme === 'light' ? (
+          <IcoMoon size={14} />
+        ) : theme === 'dark' ? (
+          <IcoHeart size={14} />
+        ) : (
+          <IcoSun size={14} />
+        )}
       </button>
 
       <button

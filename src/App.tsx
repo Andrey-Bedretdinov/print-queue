@@ -12,10 +12,12 @@ import {
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import { AnimatePresence, motion } from 'framer-motion'
-import type { AppState, Job, Printer } from '../shared/types'
+import { THEMES, type AppState, type Job, type Printer } from '../shared/types'
 import type { ToastMessage } from '../shared/ipc'
 import { api } from './lib/api'
 import { playStartSound } from './lib/sounds'
+import { cheer } from './lib/cheer'
+import { Cat } from './components/Cat'
 import { TitleBar } from './components/TitleBar'
 import { Toolbar, type Filter } from './components/Toolbar'
 import { Rail } from './components/Rail'
@@ -108,6 +110,7 @@ export default function App() {
     for (const id of now) {
       if (!seen.has(id)) {
         playStartSound()
+        cheer()
         break
       }
     }
@@ -440,6 +443,7 @@ export default function App() {
         res?.needsSpooling,
       )
     } else if (from !== to) {
+      cheer()
       const target = state?.printers.find((p) => p.id === to)
       const label = others.length
         ? `${others.length + 1} задания`
@@ -482,7 +486,10 @@ export default function App() {
       if (!paths.length) return
       const res = await api.addFiles(paths, printerId)
       const printer = state?.printers.find((p) => p.id === printerId)
-      if (res?.ok) pushToast('info', `${res.added} файл(ов) в очередь`, printer?.name)
+      if (res?.ok) {
+        cheer()
+        pushToast('info', `${res.added} файл(ов) в очередь`, printer?.name)
+      }
       else pushToast('warn', 'Не удалось добавить файлы', printer?.name)
     },
     [state?.printers],
@@ -625,7 +632,9 @@ export default function App() {
           alerts={activeIncidents.length}
           onAlerts={() => setDrawer((v) => !v)}
           theme={settings.theme}
-          onTheme={() => api.settings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
+          onTheme={() =>
+            api.settings({ theme: THEMES[(THEMES.indexOf(settings.theme) + 1) % THEMES.length] })
+          }
           sound={settings.sound}
           onSound={() => {
             // Включение слышно сразу: иначе непонятно, что именно включилось.
@@ -805,6 +814,8 @@ export default function App() {
             />
           )}
         </AnimatePresence>
+
+        <Cat active={settings.theme === 'pink'} />
 
         <Toasts items={toasts} onClose={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
 

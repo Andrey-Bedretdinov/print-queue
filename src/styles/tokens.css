@@ -59,6 +59,56 @@
   --led-off: #cacdcf;
 }
 
+/*
+ * Нежно-розовая. Собрана по той же сетке токенов, что светлая и тёмная, поэтому
+ * ни один компонент про неё не знает: меняются только значения. Акцент уводится
+ * из синего в розовый целиком, включая состояния кнопок и полосы прогресса —
+ * иначе тема выглядит как светлая, которую забыли докрасить.
+ */
+:root[data-theme='pink'] {
+  --primary: #e0559a;
+  --primary-hover: #c33c80;
+  --primary-soft: #ffe6f1;
+  --primary-softer: #fff2f7;
+  --primary-line: #ffc9de;
+  --primary-mid: #f490bd;
+  --primary-disabled: #f7d3e3;
+
+  --ok: #4bb98a;
+  --ok-line: #cdefe0;
+  --ok-soft: #ecfbf4;
+  --warn: #e2903c;
+  --warn-line: #f7dcbb;
+  --warn-soft: #fff6ea;
+  --err: #e05070;
+  --err-line: #ffd2dc;
+  --err-soft: #fff0f3;
+
+  --bg: #fff4f8;
+  --surface: #ffffff;
+  --card: #fffafc;
+  --surface-2: #fff7fa;
+  --surface-3: #ffeef5;
+  --rail: #fff8fb;
+  --chrome: #ffffff;
+  --line: #ffe0ec;
+  --line-strong: #ffc9de;
+  --stroke: #f0b9d0;
+  --text: #4a2233;
+  --text-2: #6b3548;
+  --text-3: #8d5c72;
+  --text-4: #b98fa3;
+  --hover: #fff2f7;
+  --active: #ffe6f1;
+  --scroll-thumb: #ffc9de;
+  --scroll-track: #fff2f7;
+  --shadow-1: 0 2px 3px 0 #e0559a1f, 0 0 2px 0 #e0559a1a;
+  --shadow-2: 0 10px 24px -6px #e0559a33, 0 0 2px 0 #e0559a1a;
+  --shadow-drag: 0 12px 22px -6px #e0559a4d, 0 0 0 1px var(--primary-line);
+  --overlay: rgba(74, 34, 51, 0.22);
+  --led-off: #e7c6d5;
+}
+
 :root[data-theme='dark'] {
   --bg: #161c27;
   --surface: #1b2434;
