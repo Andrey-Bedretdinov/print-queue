@@ -10,6 +10,15 @@ interface Props {
   onClose: () => void
 }
 
+/** Почему снимка нет — словами, а не кодом ошибки помощника. */
+function shotNote(error?: string) {
+  if (error === 'no-emf') return 'Задание пришло не в формате Windows — показать нечего'
+  if (error === 'still-spooling') {
+    return 'Задание ещё пишется в очередь — снимок появится через несколько секунд'
+  }
+  return 'Не удалось получить страницу задания из очереди'
+}
+
 export function PreviewModal({ job, onClose }: Props) {
   const [data, setData] = useState<PreviewPayload | null>(null)
   const [fit, setFit] = useState(true)
@@ -50,10 +59,7 @@ export function PreviewModal({ job, onClose }: Props) {
                 ext: job.ext,
                 bytes: job.bytes,
                 pages: job.pages,
-                note:
-                  shot.error === 'no-emf'
-                    ? 'Задание пришло не в формате Windows — показать нечего'
-                    : 'Не удалось получить страницу задания из очереди',
+                note: shotNote(shot.error),
               },
         )
       })

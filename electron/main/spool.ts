@@ -275,6 +275,18 @@ public static class PQSpool
      */
     public static int Shot(string printer, uint jobId, int width, int page, string outPath)
     {
+        // Пока программа-источник дописывает задание, ReadPrinter отдаёт
+        // обрезок, и в нём не находится ни одной страницы. Пачка из Lightroom
+        // пишется секундами, а снимок открывают сразу после отправки — ждём
+        // ровно так же, как ждёт перенос, и только потом читаем.
+        IntPtr wait = Open(printer);
+        try
+        {
+            JOB_INFO_1 pending = WaitSpooled(wait, jobId);
+            if ((pending.Status & JOB_STATUS_SPOOLING) != 0) throw new Exception("still-spooling");
+        }
+        finally { ClosePrinter(wait); }
+
         byte[] data = ReadJob(printer, jobId);
         List<byte[]> pages = Pages(data);
         if (pages.Count == 0) throw new Exception("no-emf");

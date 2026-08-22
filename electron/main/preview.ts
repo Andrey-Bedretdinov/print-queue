@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { extOf, type PreviewPayload } from '../../shared/types'
-import { CSHARP } from './spool'
+import { CSHARP, log } from './spool'
 import { psJsonFile, psq } from './powershell'
 import { BROWSER, PHOTO, decodePhoto } from './photo'
 
@@ -148,7 +148,27 @@ export interface JobShot {
   error?: string
 }
 
-const shots = new Map<string, JobShot>()
+interface Cached extends JobShot {
+  at: number
+}
+
+const shots = new Map<string, Cached>()
+
+/**
+ * Неудачу помним недолго. Единственная неустранимая причина — «страницы в
+ * задании нет» (`no-emf`): её выносим после того, как задание дописано, и
+ * второй раз спрашивать нечего. Всё остальное — задание ещё пишется, помощник
+ * не отработал, задание исчезло из очереди — со временем проходит само, и
+ * запомненный отказ означал бы, что снимка у этого задания не будет уже
+ * никогда. Ровно на этом превью и не показывалось.
+ */
+const FAIL_TTL = 12_000
+
+function usable(hit: Cached) {
+  if (!hit.error) return true
+  if (hit.error === 'no-emf') return true
+  return Date.now() - hit.at < FAIL_TTL
+}
 
 /**
  * Снимок кэшируется: одна страница крупного фото читается из спулера и
@@ -162,7 +182,7 @@ export async function jobShot(
 ): Promise<JobShot> {
   const key = `${printer}#${jobId}#${width}#${page}`
   const hit = shots.get(key)
-  if (hit) return hit
+  if (hit && usable(hit)) return hit
 
   const file = join(tmpdir(), `pq-shot-${randomUUID()}.png`)
   const fill = (template: string) =>
@@ -175,9 +195,12 @@ export async function jobShot(
 
   let result: JobShot = { url: '', pages: 0, error: 'helper-failed' }
   let res = await psJsonFile<{ ok: boolean; pages?: number; error?: string }>(fill(SHOT), 60000)
-  // Драйвер спулит не EMF, а XPS — тогда страницу рисует WPF.
+  // Драйвер спулит не EMF, а XPS — тогда страницу рисует WPF. Если и XPS не
+  // вышел, наружу отдаём исходную причину: «пакет не XPS» человеку ничего не
+  // говорит, а «страницы в задании нет» — говорит, и интерфейс на неё смотрит.
   if (res && !res.ok && res.error === 'no-emf') {
-    res = await psJsonFile<{ ok: boolean; pages?: number; error?: string }>(fill(XPS), 60000)
+    const xps = await psJsonFile<{ ok: boolean; pages?: number; error?: string }>(fill(XPS), 60000)
+    if (xps?.ok) res = xps
   }
   if (res?.ok) {
     try {
@@ -195,8 +218,11 @@ export async function jobShot(
     const oldest = shots.keys().next().value
     if (oldest !== undefined) shots.delete(oldest)
   }
-  // Неудачу тоже помним: иначе наведение мышью будет дёргать спулер без конца.
-  shots.set(key, result)
+  // Неудачу тоже помним — но ненадолго, см. FAIL_TTL: иначе наведение мышью
+  // будет дёргать спулер без конца, а запомнить её навсегда нельзя.
+  shots.set(key, { ...result, at: Date.now() })
+  // В журнал — чтобы в следующий раз не выяснять причину по скриншоту.
+  if (result.error) log(`снимок ${printer} #${jobId}: ${result.error}`)
   return result
 }
 

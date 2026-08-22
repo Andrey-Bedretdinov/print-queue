@@ -44,6 +44,11 @@ function shotOf(jobId: string) {
       .then((shot) => shot.url)
       .catch(() => '')
     cache.set(jobId, pending)
+    // Пустой ответ не запоминаем: задание могло ещё дописываться в спулер, и
+    // следующее наведение должно попробовать снова, а не отдать старый отказ.
+    void pending.then((url) => {
+      if (!url && cache.get(jobId) === pending) cache.delete(jobId)
+    })
   }
   return pending
 }
