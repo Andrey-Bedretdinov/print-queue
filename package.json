@@ -1,6 +1,6 @@
 {
   "name": "print-queue",
-  "version": "1.11.2",
+  "version": "1.11.3",
   "description": "Compact print queue manager for Windows 10/11",
   "author": {
     "name": "Andrey Bedretdinov",
@@ -66,9 +66,6 @@
     "win": {
       "icon": "build/icon.png",
       "artifactName": "PrintQueue-${version}-win-${arch}.${ext}",
-      "signtoolOptions": {
-        "publisherName": "Andrey Bedretdinov"
-      },
       "legalTrademarks": "MIT License",
       "requestedExecutionLevel": "requireAdministrator",
       "signAndEditExecutable": true,
