@@ -33,6 +33,8 @@ const api = {
   elevate: (): Promise<boolean> => ipcRenderer.invoke(IPC.invoke.elevate),
   pickFiles: (): Promise<string[]> => ipcRenderer.invoke(IPC.invoke.pickFiles),
   openLog: (): Promise<string> => ipcRenderer.invoke(IPC.invoke.openLog),
+  /** Перезапуск с установкой скачанного обновления. */
+  installUpdate: (): Promise<boolean> => ipcRenderer.invoke(IPC.invoke.installUpdate),
   enableSpooling: (printerId: string): Promise<{ ok: boolean; reason?: string }> =>
     ipcRenderer.invoke(IPC.invoke.enableSpooling, printerId),
   moveJob: (

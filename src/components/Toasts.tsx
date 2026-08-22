@@ -35,6 +35,15 @@ export function Toasts({ items, onClose }: Props) {
                   Перезапустить от администратора
                 </button>
               )}
+              {t.action === 'update' && (
+                <button
+                  className="btn btn-soft"
+                  style={{ height: 20, marginTop: 4, fontSize: 11 }}
+                  onClick={() => api.installUpdate()}
+                >
+                  Перезапустить и обновить
+                </button>
+              )}
               {t.action === 'spool' && t.actionArg && (
                 <button
                   className="btn btn-soft"

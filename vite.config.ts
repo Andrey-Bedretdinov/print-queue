@@ -20,7 +20,9 @@ export default defineConfig({
         vite: {
           build: {
             outDir: 'dist-electron/main',
-            rollupOptions: { external: ['electron'] },
+            // electron-updater остаётся зависимостью в node_modules: он тянет
+            // за собой динамические require, и сборка его в один файл ломается.
+            rollupOptions: { external: ['electron', 'electron-updater'] },
           },
         },
       },

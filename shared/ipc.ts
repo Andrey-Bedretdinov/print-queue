@@ -21,6 +21,7 @@ export const IPC = {
     elevate: 'pq:elevate',
     enableSpooling: 'pq:enable-spooling',
     openLog: 'pq:open-log',
+    installUpdate: 'pq:install-update',
   },
 } as const
 
@@ -34,8 +35,9 @@ export interface ToastMessage {
   kind: 'ok' | 'warn' | 'error' | 'info'
   text: string
   sub?: string
-  /** Кнопка в уведомлении: перезапуск с правами или включение очереди печати. */
-  action?: 'elevate' | 'spool'
+  /** Кнопка в уведомлении: перезапуск с правами, включение очереди печати
+   *  или установка скачанного обновления. */
+  action?: 'elevate' | 'spool' | 'update'
   /** Принтер, к которому относится действие. */
   actionArg?: string
 }

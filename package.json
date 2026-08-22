@@ -1,6 +1,6 @@
 {
   "name": "print-queue",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Compact print queue manager for Windows 10/11",
   "author": {
     "name": "Andrey Bedretdinov",
@@ -34,6 +34,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "electron-updater": "^6.8.9",
     "framer-motion": "^11.15.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -44,6 +45,13 @@
   },
   "build": {
     "appId": "com.bedretdinov.printqueue",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Andrey-Bedretdinov",
+        "repo": "print-queue"
+      }
+    ],
     "productName": "Print Queue",
     "copyright": "Andrey Bedretdinov",
     "directories": {
@@ -65,8 +73,18 @@
       "requestedExecutionLevel": "requireAdministrator",
       "signAndEditExecutable": true,
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "zip", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {

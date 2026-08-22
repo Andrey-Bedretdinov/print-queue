@@ -10,6 +10,7 @@ import { PrintManager } from './manager'
 import { buildPreview, jobShot, thumbnail } from './preview'
 import { jobRef } from './windows-source'
 import { psRun } from './powershell'
+import { installUpdate, startUpdates } from './updater'
 
 process.env.APP_ROOT = join(__dirname, '..', '..')
 const DEV_URL = process.env.VITE_DEV_SERVER_URL
@@ -104,6 +105,8 @@ app.whenReady().then(() => {
   manager.version = app.getVersion()
   manager.start()
 
+  startUpdates((toast) => send(IPC.toast, toast))
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -192,6 +195,9 @@ ipcMain.handle(IPC.invoke.openLog, () => {
   shell.showItemInFolder(file)
   return file
 })
+
+/** Перезапуск на скачанное обновление — по кнопке в уведомлении. */
+ipcMain.handle(IPC.invoke.installUpdate, () => installUpdate())
 
 /** Перезапуск с правами администратора — нужен для переноса чужих заданий. */
 ipcMain.handle(IPC.invoke.elevate, async () => {

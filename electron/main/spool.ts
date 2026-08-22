@@ -307,15 +307,20 @@ public static class PQSpool
                 {
                     // Лист бумаги белый; без заливки прозрачный фон даст чёрный PNG.
                     g.Clear(System.Drawing.Color.White);
-                    IntPtr hdc = g.GetHdc();
-                    try
+                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    // Метафайл проигрывает GDI+, а не PlayEnhMetaFile: страница
+                    // из спула записана для принтерного DC, и в DC в памяти GDI
+                    // отказывается её играть — ошибка 1, «недопустимая функция».
+                    // Проверено на живом задании EPSON: PlayEnhMetaFile падает и
+                    // в DC от GDI+ Bitmap, и в CreateCompatibleDC+CreateDIBSection,
+                    // а DrawImage тот же самый EMF рисует. В принтерный DC перенос
+                    // задания по-прежнему играет напрямую — там всё работает.
+                    // Владение хэндлом не отдаём: его снимает finally ниже.
+                    using (System.Drawing.Imaging.Metafile mf =
+                        new System.Drawing.Imaging.Metafile(hemf, false))
                     {
-                        RECT r;
-                        r.left = 0; r.top = 0; r.right = w; r.bottom = h;
-                        if (!PlayEnhMetaFile(hdc, hemf, ref r))
-                            throw new Exception("play:" + Marshal.GetLastWin32Error());
+                        g.DrawImage(mf, new System.Drawing.Rectangle(0, 0, w, h));
                     }
-                    finally { g.ReleaseHdc(hdc); }
                 }
                 bmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
             }
