@@ -252,6 +252,7 @@ export const mockApi: PqApi = {
   pickFiles: async () => [],
   openLog: async () => '',
   installUpdate: async () => false,
+  updateNow: async () => false,
   addFiles: async () => ({ ok: true, added: 1 }),
   preview: async (path) => ({
     kind: 'text',

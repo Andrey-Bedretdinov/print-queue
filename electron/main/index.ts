@@ -10,7 +10,7 @@ import { PrintManager } from './manager'
 import { buildPreview, jobShot, thumbnail } from './preview'
 import { jobRef } from './windows-source'
 import { psRun } from './powershell'
-import { installUpdate, startUpdates } from './updater'
+import { installUpdate, startUpdates, updateNow } from './updater'
 
 process.env.APP_ROOT = join(__dirname, '..', '..')
 const DEV_URL = process.env.VITE_DEV_SERVER_URL
@@ -198,6 +198,9 @@ ipcMain.handle(IPC.invoke.openLog, () => {
 
 /** Перезапуск на скачанное обновление — по кнопке в уведомлении. */
 ipcMain.handle(IPC.invoke.installUpdate, () => installUpdate())
+
+/** Пункт «Обновить» в меню версии. Ход дела показывают уведомления. */
+ipcMain.handle(IPC.invoke.updateNow, () => updateNow())
 
 /** Перезапуск с правами администратора — нужен для переноса чужих заданий. */
 ipcMain.handle(IPC.invoke.elevate, async () => {

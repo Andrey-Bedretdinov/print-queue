@@ -9,6 +9,18 @@
         "dev"
       ],
       "port": 5273
+    },
+    {
+      "name": "vite-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "env": {
+        "PQ_WEB": "1"
+      },
+      "port": 5273
     }
   ]
 }

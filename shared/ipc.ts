@@ -22,6 +22,7 @@ export const IPC = {
     enableSpooling: 'pq:enable-spooling',
     openLog: 'pq:open-log',
     installUpdate: 'pq:install-update',
+    updateNow: 'pq:update-now',
   },
 } as const
 

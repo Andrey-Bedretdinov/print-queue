@@ -35,6 +35,8 @@ const api = {
   openLog: (): Promise<string> => ipcRenderer.invoke(IPC.invoke.openLog),
   /** Перезапуск с установкой скачанного обновления. */
   installUpdate: (): Promise<boolean> => ipcRenderer.invoke(IPC.invoke.installUpdate),
+  /** Проверить обновление и поставить его сразу, если нашлось. */
+  updateNow: (): Promise<boolean> => ipcRenderer.invoke(IPC.invoke.updateNow),
   enableSpooling: (printerId: string): Promise<{ ok: boolean; reason?: string }> =>
     ipcRenderer.invoke(IPC.invoke.enableSpooling, printerId),
   moveJob: (

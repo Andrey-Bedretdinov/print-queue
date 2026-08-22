@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { motion } from 'framer-motion'
 import type { Settings } from '../../shared/types'
 import { api } from '../lib/api'
-import { IcoBoard, IcoGrid, IcoList, IcoMinus, IcoPlus, IcoRail, IcoShield } from './icons'
+import { IcoBoard, IcoGrid, IcoList, IcoMinus, IcoPlus, IcoRail, IcoRetry, IcoShield, IcoExternal } from './icons'
 
 export type Filter = 'all' | 'active' | 'error'
 
@@ -157,14 +158,100 @@ export function Toolbar({
           <span className={`switch${settings.simulation ? ' on' : ''}`} />
           Эмуляция
         </button>
-        <button
-          className="version"
-          title="Версия приложения. Нажмите, чтобы открыть журнал переносов"
-          onClick={() => api.openLog()}
-        >
-          {version}
-        </button>
+        <VersionMenu version={version} />
       </div>
     </div>
+  )
+}
+
+/**
+ * Версия в углу — заодно и точка входа к обновлению. Отдельной кнопки для него
+ * в окне не завести: место в панели кончилось, а искать её человеку всё равно
+ * негде — версия единственное, на что он смотрит, проверяя «обновилось или
+ * нет». Журнал переносов, который раньше открывался кликом, переехал сюда же.
+ */
+function VersionMenu({ version }: { version: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const anchor = useRef<HTMLButtonElement>(null)
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const a = anchor.current?.getBoundingClientRect()
+    const el = ref.current
+    if (!a || !el) return
+    // offsetWidth, а не getBoundingClientRect: меню появляется с анимацией
+    // масштаба, и в первый кадр прямоугольник приходит уменьшенным — меню
+    // вставало на пару пикселей правее кнопки.
+    const width = el.offsetWidth
+    setPos({
+      x: Math.max(6, Math.min(a.right - width, window.innerWidth - width - 6)),
+      y: a.bottom + 4,
+    })
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    const away = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node) && !anchor.current?.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    const id = setTimeout(() => document.addEventListener('mousedown', away), 0)
+    document.addEventListener('keydown', esc)
+    window.addEventListener('blur', close)
+    return () => {
+      clearTimeout(id)
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc)
+      window.removeEventListener('blur', close)
+    }
+  }, [open])
+
+  return (
+    <>
+      <button
+        ref={anchor}
+        className="version"
+        title="Версия приложения"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {version}
+      </button>
+      {open && (
+        <motion.div
+          ref={ref}
+          className="menu"
+          style={{ left: pos.x, top: pos.y }}
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.12, ease: [0.22, 0.61, 0.36, 1] }}
+        >
+          <button
+            className="menu-item"
+            onClick={() => {
+              setOpen(false)
+              void api.updateNow()
+            }}
+          >
+            <IcoRetry size={12} />
+            <span className="menu-text">Обновить</span>
+          </button>
+          <button
+            className="menu-item"
+            onClick={() => {
+              setOpen(false)
+              void api.openLog()
+            }}
+          >
+            <IcoExternal size={12} />
+            <span className="menu-text">Лог</span>
+          </button>
+        </motion.div>
+      )}
+    </>
   )
 }
