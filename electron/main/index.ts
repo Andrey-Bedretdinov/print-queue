@@ -180,10 +180,6 @@ ipcMain.handle(IPC.invoke.settings, (_e, patch: Partial<Settings>) => {
   return manager?.updateSettings(patch)
 })
 
-ipcMain.handle(IPC.invoke.rename, (_e, printerId: string, name: string) =>
-  manager?.renamePrinter(printerId, name),
-)
-
 ipcMain.handle(IPC.invoke.enableSpooling, (_e, printerId: string) =>
   manager?.enableSpooling(printerId),
 )

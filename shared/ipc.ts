@@ -17,7 +17,6 @@ export const IPC = {
     incident: 'pq:incident',
     settings: 'pq:settings',
     window: 'pq:window',
-    rename: 'pq:rename-printer',
     elevate: 'pq:elevate',
     enableSpooling: 'pq:enable-spooling',
     openLog: 'pq:open-log',

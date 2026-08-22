@@ -240,13 +240,6 @@ export const mockApi: PqApi = {
     emit()
     return true
   },
-  renamePrinter: async (id, name) => {
-    const p = printers.find((x) => x.id === id)
-    if (!p) return { ok: false, reason: 'нет принтера' }
-    p.name = name
-    emit()
-    return { ok: true }
-  },
   elevate: async () => false,
   enableSpooling: async () => ({ ok: true }),
   pickFiles: async () => [],

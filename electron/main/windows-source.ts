@@ -295,10 +295,6 @@ export async function purgePrintedJobs(printers: string[]) {
   )
 }
 
-export async function renameSystemPrinter(oldName: string, newName: string) {
-  return psRun(`Rename-Printer -Name '${psq(oldName)}' -NewName '${psq(newName)}' -ErrorAction Stop`)
-}
-
 /** Sends a file to a named printer through the shell's PrintTo verb. */
 export async function systemPrintFile(filePath: string, printerName: string) {
   rememberPrinted(filePath)

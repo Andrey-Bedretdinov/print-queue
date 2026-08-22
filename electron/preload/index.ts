@@ -28,8 +28,6 @@ const api = {
   },
   jobAction: (jobId: string, kind: JobActionKind): Promise<boolean> =>
     ipcRenderer.invoke(IPC.invoke.jobAction, jobId, kind),
-  renamePrinter: (printerId: string, name: string): Promise<{ ok: boolean; reason?: string }> =>
-    ipcRenderer.invoke(IPC.invoke.rename, printerId, name),
   elevate: (): Promise<boolean> => ipcRenderer.invoke(IPC.invoke.elevate),
   pickFiles: (): Promise<string[]> => ipcRenderer.invoke(IPC.invoke.pickFiles),
   openLog: (): Promise<string> => ipcRenderer.invoke(IPC.invoke.openLog),

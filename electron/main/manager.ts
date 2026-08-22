@@ -9,10 +9,8 @@ import { estimatePages } from './preview'
 import { store } from './store'
 import {
   enableSpooling,
-  idFor,
   jobRef,
   readSystem,
-  renameSystemPrinter,
   systemJobAction,
   systemPrintFile,
   systemPrinterAction,
@@ -454,43 +452,6 @@ export class PrintManager {
     }
     void this.pollSystem()
     return ok ? { ok: true } : { ok: false, reason: 'Нужны права администратора' }
-  }
-
-  /** Переименование принтера — системного через спулер, виртуального в памяти. */
-  async renamePrinter(printerId: string, name: string) {
-    const clean = name.trim()
-    if (!clean) return { ok: false, reason: 'Пустое имя' }
-
-    const sim = this.sim.printers.find((p) => p.id === printerId)
-    if (sim) {
-      sim.name = clean
-      this.markDirty()
-      this.push(true)
-      return { ok: true }
-    }
-
-    const sys = this.sysPrinters.find((p) => p.id === printerId)
-    if (!sys) return { ok: false, reason: 'Принтер не найден' }
-    if (sys.name === clean) return { ok: true }
-    const ok = await renameSystemPrinter(sys.name, clean)
-    if (!ok) return { ok: false, reason: 'Windows не дал переименовать — нужны права' }
-
-    // Идентификатор принтера собран из имени: переносим настройки на новый.
-    const nextId = idFor(clean)
-    const swap = (list: string[]) => list.map((x) => (x === printerId ? nextId : x))
-    store.patchSettings({
-      hidden: swap(store.settings.hidden),
-      order: swap(store.settings.order),
-    })
-    for (const incident of store.incidents) {
-      if (incident.printerId === printerId) {
-        incident.printerId = nextId
-        incident.printerName = clean
-      }
-    }
-    store.incidents = [...store.incidents]
-    void this.pollSystem()
-    return { ok: true }
   }
 
   updateSettings(patch: Partial<Settings>) {
